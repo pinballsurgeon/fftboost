@@ -1,32 +1,79 @@
-# FFTBoost
 
-[![Acceptance Gate](https://github.com/pinballsurgeon/fftboost/actions/workflows/acceptance.yml/badge.svg)](https://github.com/pinballsurgeon/fftboost/actions/workflows/acceptance.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+# fftboost
 
-FFTBoost is a time-series analysis library designed to build robust and interpretable models by leveraging frequency-domain features within a boosting-like framework.
+stagewise spectral feature selector + small linear head. built for time-series windows where the signal is sparse in the fft magnitude domain.
 
-### The Problem
+## install
 
-Standard machine learning models applied to raw time-series data often overfit to high-frequency noise or learn patterns that are not physically meaningful. This can lead to "twitchy" or unstable predictions that are difficult to trust, especially in control system applications where stability and efficiency are paramount.
-
-The goal of this project is to move beyond simple measurement accuracy and enable more stable, predictive insights.
-
-### The FFTBoost Approach
-
-FFTBoost addresses this problem with a **two-branch architecture** that separates the feature engineering and selection process:
-
-1.  **The FFT Branch:** A specialized, iterative algorithm hunts for a sparse set of the most impactful Fast Fourier Transform (FFT) frequency bins. It greedily selects features based on their correlation with the model's residual error, prioritizing physically relevant frequency bands while penalizing noise.
-
-2.  **The Auxiliary Branch:** A curated set of low-dimensional, stable features (such as wavelet energies and Hilbert phase statistics) provides the model with broad contextual information about the signal.
-
-These two branches are combined in a simple, regularized final model (e.g., Ridge regression). This approach is designed to produce models that are more robust to noise, faster to run at inference, and more interpretable than "black-box" alternatives.
-
-## Getting Started
-
-### Prerequisites
-*   Python 3.9+
-
-### Installation
-Install the package directly from GitHub:
 ```bash
-pip install git+https://github.com/pinballsurgeon/fftboost.git
+pip install git+https://github.com/pinballsurgeon/fftboost.git --quiet
+```
+
+## what it does
+
+* picks fft “atoms” by residual correlation with physics-aware priors (band quotas, min spacing, hf/coherence penalties)
+* fits a compact ridge head on the selected atoms (+ optional aux features like wavelet energies, hilbert stats)
+* blocked time-series cross-validation with paired Δr² reporting
+* fast inference suitable for real-time windows
+
+> note: not tree boosting; not generic gradient boosting. this is guided, additive atom pursuit in the frequency domain.
+
+## when to use
+
+* fundamentals/harmonics/interharmonics drive the target
+* spectra are wide (10³–10⁴ bins) but the answer is sparse
+* you want inspectable frequency picks and low latency
+
+## quick start
+
+```python
+import numpy as np
+from fftboost import FFTBoost          # stagewise atom selection + ridge head
+
+fs = 1000
+window_s = 0.5
+x = np.random.randn(int(60*fs))        # your 1-D signal
+y = np.random.randn(int(60/window_s))  # your per-window target
+
+model = FFTBoost(
+    fs=fs,
+    window_s=window_s,
+    hop_s=0.25,
+    atoms=16,
+    band_quotas={"lf":1, "fund":2, "ih1":2, "ih2":1, "hf":1},
+    min_sep_bins=3,
+    lambda_hf=0.10,
+    lambda_coh=3.0
+)
+
+model.fit(x, y)
+yhat = model.predict(x)
+
+print("selected bins (hz):", model.selected_freqs_hz_)
+print("cv summary:", model.cv_report_)  # includes paired Δr² vs baseline
+```
+
+## design notes
+
+* residual-driven, stagewise atom selection (greedy, with priors)
+* periodic ridge refits to stabilize coefficients
+* auxiliary features are optional and do not drive selection (keeps frequency picks honest)
+
+## roadmap
+
+* shrinkage + per-stage contributions (toward true boosting)
+* pluggable losses (huber/quantile) and line search
+* early stop on blocked validation
+* minimal model artifact export/import
+
+## license
+
+mit
+
+## maintainer
+
+dan ehlers — [github: pinballsurgeon](https://github.com/pinballsurgeon)
+linkedin: [https://www.linkedin.com/in/dan-ehlers-32953444/](https://www.linkedin.com/in/dan-ehlers-32953444/)
+email: [pinballsurgeon@gmail.com](mailto:pinballsurgeon@gmail.com)
+
+---
