@@ -120,3 +120,36 @@ def extract_features_from_signals(
 
     x_aux = np.hstack(aux_features_list)
     return x_fft, x_aux, freqs
+
+
+def compute_labels(windows: np.ndarray, freqs: np.ndarray, config: Mapping[str, Any]) -> np.ndarray:
+    ehi_weights = config["target"]["ehi_weights"]
+    fft_features = np.abs(rfft(windows, axis=1))
+
+    nyq_bin = len(freqs) - 1
+    labels = []
+    for row in fft_features:
+        fb = np.where((freqs >= 45) & (freqs <= 55))[0]
+        if fb.size == 0:
+            thd, ipr = 0.0, 0.0
+        else:
+            k1 = fb[np.argmax(row[fb])]
+            v1_sq = row[k1] ** 2 + 1e-12
+            h_sq = sum(
+                np.max(
+                    row[max(1, int(round(m * k1)) - 1) : min(nyq_bin - 1, int(round(m * k1)) + 2)]
+                )
+                ** 2
+                for m in range(2, 9)
+                if 1 <= int(round(m * k1)) < nyq_bin
+            )
+            thd = np.sqrt(h_sq / v1_sq)
+
+            ib = np.where((freqs >= 90) & (freqs <= 130))[0]
+            ip_sq = float(np.sum(row[ib] ** 2))
+            tot_sq = float(np.sum(row[1:nyq_bin] ** 2) + 1e-12)
+            ipr = ip_sq / tot_sq
+
+        labels.append(ehi_weights["thd"] * thd + ehi_weights["ipr"] * ipr)
+
+    return np.array(labels)
