@@ -1,5 +1,6 @@
 from typing import Any, Optional, cast
 
+import numpy as np
 import yaml
 
 from fftboost.core.cv import run_full_cv_evaluation
@@ -10,13 +11,28 @@ from fftboost.core.metrics import (
 from fftboost.core.types import CvResults, JBeatsResult, LatencyResult
 
 
+# A placeholder generator for the API, in case a user wants to run a demo
+def _placeholder_generator(
+    config: dict[str, Any], seed: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    fs = config.get("fs", 1000)
+    duration_s = config.get("duration_s", 1)
+    n_total = int(duration_s * fs)
+    tvec = np.arange(n_total) / fs
+    i_signal = np.random.randn(n_total)
+    v_signal = np.random.randn(n_total)
+    return i_signal, v_signal, tvec
+
+
 class FFTBoost:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.results: Optional[CvResults] = None
 
-    def run_evaluation(self) -> None:
-        self.results = run_full_cv_evaluation(self.config)
+    def run_evaluation_with_generator(self) -> None:
+        from fftboost.cli import generate_synthetic_signals
+
+        self.results = run_full_cv_evaluation(self.config, generate_synthetic_signals)
 
     def get_j_beats_telemetry(self) -> JBeatsResult:
         if self.results is None or self.results["fold_results"] is None:

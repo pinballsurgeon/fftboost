@@ -1,5 +1,6 @@
 from typing import Any
 
+from fftboost.cli import generate_synthetic_signals
 from fftboost.core.cv import run_full_cv_evaluation
 
 
@@ -36,8 +37,8 @@ def get_default_test_config() -> dict[str, Any]:
 def test_full_pipeline_is_deterministic() -> None:
     config = get_default_test_config()
 
-    run1_results = run_full_cv_evaluation(config)
-    run2_results = run_full_cv_evaluation(config)
+    run1_results = run_full_cv_evaluation(config, generate_synthetic_signals)
+    run2_results = run_full_cv_evaluation(config, generate_synthetic_signals)
 
     fold_results1 = run1_results["fold_results"]
     fold_results2 = run2_results["fold_results"]

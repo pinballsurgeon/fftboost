@@ -1,11 +1,10 @@
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 from sklearn.model_selection import TimeSeriesSplit
 
-from data.synthetic_generator import generate_synthetic_signals
 from fftboost.core.features import (
     compute_fft,
     compute_labels,
@@ -17,9 +16,12 @@ from fftboost.core.types import CvResults, FoldResult
 from fftboost.utils.scaling import robust_scale, zscale
 
 
-def run_full_cv_evaluation(config: dict[str, Any]) -> CvResults:
+def run_full_cv_evaluation(
+    config: dict[str, Any],
+    signal_generator: Callable[[dict[str, Any], int], tuple[np.ndarray, np.ndarray, np.ndarray]],
+) -> CvResults:
     seed = config["seed"]
-    i_signal, v_signal, _ = generate_synthetic_signals(config, seed)
+    i_signal, v_signal, _ = signal_generator(config, seed)
     x_fft_all, x_aux_all, _ = extract_features_from_signals(i_signal, v_signal, config)
 
     iwins = create_windows(i_signal, config)

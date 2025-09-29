@@ -1,0 +1,34 @@
+seed: 1337
+fs: 1000
+duration_s: 100
+window_s: 0.4
+hop_s: 0.2
+cv_folds: 10
+latency_budget_ms: 2.0
+
+use_wavelets: true
+wavelet_family: "db4"
+wavelet_level: 4
+use_hilbert_phase: true
+coherence_subbands:
+  - [1, 40]
+  - [40, 100]
+  - [100, 200]
+  - [200, 400]
+  - [400, 500]
+
+target:
+  ehi_weights: { thd: 0.45, ipr: 0.55 }
+
+gbdt_params:
+  n_estimators: 100
+  max_depth: 4
+  learning_rate: 0.08
+  subsample: 0.85
+
+fftboost:
+  atoms: 16
+  lambda_hf: 0.10
+  lambda_coh: 3.0
+  min_sep_bins: 3
+  ridge_alpha: 0.1
