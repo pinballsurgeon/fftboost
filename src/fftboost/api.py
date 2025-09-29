@@ -1,6 +1,6 @@
 from typing import Any, Optional, cast
 
-import numpy as np
+import requests
 import yaml
 
 from fftboost.core.cv import run_full_cv_evaluation
@@ -9,19 +9,6 @@ from fftboost.core.metrics import (
     calculate_m_latency_gate,
 )
 from fftboost.core.types import CvResults, JBeatsResult, LatencyResult
-
-
-# A placeholder generator for the API, in case a user wants to run a demo
-def _placeholder_generator(
-    config: dict[str, Any], seed: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    fs = config.get("fs", 1000)
-    duration_s = config.get("duration_s", 1)
-    n_total = int(duration_s * fs)
-    tvec = np.arange(n_total) / fs
-    i_signal = np.random.randn(n_total)
-    v_signal = np.random.randn(n_total)
-    return i_signal, v_signal, tvec
 
 
 class FFTBoost:
@@ -55,7 +42,13 @@ class FFTBoost:
 
 
 def load_config_from_yaml(path: str) -> dict[str, Any]:
-    with open(path) as f:
-        untyped_config = yaml.safe_load(f)
+    if path.startswith("http://") or path.startswith("https://"):
+        response = requests.get(path)
+        response.raise_for_status()
+        untyped_config = yaml.safe_load(response.text)
+    else:
+        with open(path) as f:
+            untyped_config = yaml.safe_load(f)
+
     config = cast(dict[str, Any], untyped_config)
     return config

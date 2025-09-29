@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fftboost"
 version = "0.3.0"
-description = "gradient boosting library with fouier feature selection for time-series analysis and inference"
+description = "gradient boosting library with fourier feature selection for time-series analysis and inference"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }
@@ -24,7 +24,8 @@ dependencies = [
     "scipy>=1.7.0",
     "pyyaml>=6.0",
     "pywavelets>=1.2.0",
-    "scikit-learn>=1.0"
+    "scikit-learn>=1.0",
+    "requests"
 ]
 
 [project.urls]
@@ -37,7 +38,8 @@ dev = [
     "ruff==0.5.0",
     "mypy==1.10.0",
     "pre-commit==3.7.1",
-    "types-PyYAML==6.0.12.12"
+    "types-PyYAML==6.0.12.12",
+    "types-requests"
 ]
 
 [project.scripts]
@@ -51,11 +53,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "F",  # pyflakes
-    "W",  # pycodestyle warnings
-    "I",  # isort (import sorting)
-    "UP", # pyupgrade
+    "E", "F", "W", "I", "UP",
 ]
 ignore = []
 
