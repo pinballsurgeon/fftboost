@@ -1,15 +1,16 @@
 from collections.abc import Sequence
-from typing import Any
 
 import numpy as np
 from scipy.stats import t as tdist
 
+from fftboost.core.types import FoldResult, JBeatsResult, LatencyResult
+
 
 def paired_ci(d: Sequence[float], conf: float = 0.95) -> tuple[float, float]:
-    d_arr = np.asarray(d, dtype=float)
+    d_arr = np.array(d, dtype=np.float64)
     if d_arr.size < 2:
         mean_val = float(np.mean(d_arr)) if d_arr.size else 0.0
-        return mean_val, float("inf")
+        return mean_val, 1e9
 
     mean_val = float(np.mean(d_arr))
     std_val = float(np.std(d_arr, ddof=1))
@@ -18,9 +19,7 @@ def paired_ci(d: Sequence[float], conf: float = 0.95) -> tuple[float, float]:
     return mean_val, tc * se_val
 
 
-def calculate_j_beats_gate(
-    fold_results: list[dict[str, float]], conf: float = 0.95
-) -> dict[str, Any]:
+def calculate_j_beats_gate(fold_results: list[FoldResult], conf: float = 0.95) -> JBeatsResult:
     deltas = [r["dFFT"] for r in fold_results]
     mean_delta, ci_width = paired_ci(deltas, conf)
     ci_low = mean_delta - ci_width
@@ -37,7 +36,7 @@ def calculate_j_beats_gate(
     }
 
 
-def calculate_m_latency_gate(inference_times_ms: list[float], budget_ms: float) -> dict[str, Any]:
+def calculate_m_latency_gate(inference_times_ms: list[float], budget_ms: float) -> LatencyResult:
     mean_latency = np.mean(inference_times_ms) if inference_times_ms else 0.0
     return {
         "latency_pass": mean_latency <= budget_ms,

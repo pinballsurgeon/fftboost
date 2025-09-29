@@ -13,10 +13,11 @@ from fftboost.core.features import (
     extract_features_from_signals,
 )
 from fftboost.core.fftboost import fit_fftboost_model, predict_with_fftboost_model
+from fftboost.core.types import CvResults, FoldResult
 from fftboost.utils.scaling import robust_scale, zscale
 
 
-def run_full_cv_evaluation(config: dict[str, Any]) -> dict[str, Any]:
+def run_full_cv_evaluation(config: dict[str, Any]) -> CvResults:
     seed = config["seed"]
     i_signal, v_signal, _ = generate_synthetic_signals(config, seed)
     x_fft_all, x_aux_all, _ = extract_features_from_signals(i_signal, v_signal, config)
@@ -26,7 +27,7 @@ def run_full_cv_evaluation(config: dict[str, Any]) -> dict[str, Any]:
     y_all = compute_labels(iwins, freqs_full, config)
 
     outer_cv = TimeSeriesSplit(n_splits=config["cv_folds"])
-    fold_results = []
+    fold_results: list[FoldResult] = []
 
     for fold, (tr_idx, va_idx) in enumerate(outer_cv.split(x_fft_all)):
         x_fft_tr, x_fft_va = x_fft_all[tr_idx], x_fft_all[va_idx]
@@ -56,4 +57,4 @@ def run_full_cv_evaluation(config: dict[str, Any]) -> dict[str, Any]:
         r2_f = r2_score(y_va, y_fft_va)
         fold_results.append({"R2_GBDT": r2_g, "R2_FFT": r2_f, "dFFT": r2_f - r2_g})
 
-    return {"fold_results": fold_results}
+    return {"fold_results": fold_results, "inference_times_ms": None}

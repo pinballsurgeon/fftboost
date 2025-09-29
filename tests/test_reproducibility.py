@@ -43,7 +43,5 @@ def test_full_pipeline_is_deterministic() -> None:
     fold_results2 = run2_results["fold_results"]
 
     assert len(fold_results1) == len(fold_results2)
-
     for fold1, fold2 in zip(fold_results1, fold_results2):
-        for key in fold1:
-            assert fold1[key] == fold2[key], f"Mismatch in fold results for key {key}"
+        assert fold1 == fold2, f"Mismatch in fold results: {fold1} vs {fold2}"
