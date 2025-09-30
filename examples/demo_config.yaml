@@ -1,15 +1,15 @@
-
 seed: 1337
 fs: 1000
-duration_s: 20  # Shorter duration for a quick run
+duration_s: 16
 window_s: 0.4
 hop_s: 0.2
-cv_folds: 3     # Fewer folds for speed
+cv_folds: 3
 
 use_wavelets: true
 wavelet_family: "db4"
 wavelet_level: 4
 use_hilbert_phase: true
+
 coherence_subbands:
   - [1, 40]
   - [40, 100]
@@ -18,7 +18,7 @@ target:
   ehi_weights: { thd: 0.45, ipr: 0.55 }
 
 fftboost:
-  atoms: 5
+  atoms: 6
   lambda_hf: 0.10
   lambda_coh: 3.0
   min_sep_bins: 3
