@@ -1,54 +1,48 @@
-from typing import Any, Optional, cast
+from __future__ import annotations
 
-import requests
-import yaml
+from typing import Any
 
-from fftboost.core.cv import run_full_cv_evaluation
-from fftboost.core.metrics import (
-    calculate_j_beats_gate,
-    calculate_m_latency_gate,
-)
-from fftboost.core.types import CvResults, JBeatsResult, LatencyResult
+import numpy as np
+import numpy.typing as npt
+
+from .config import FeatureConfig, FFTBoostConfig
+from .features import _extract_features
+from .models import _fit_model
 
 
 class FFTBoost:
-    def __init__(self, config: dict[str, Any]) -> None:
-        self.config = config
-        self.results: Optional[CvResults] = None
+    def __init__(self, fftboost_config: FFTBoostConfig, feature_config: FeatureConfig):
+        self.fftboost_config = fftboost_config
+        self.feature_config = feature_config
+        self._fitted_state: dict[str, Any] = {}
+        self.is_fitted: bool = False
 
-    def run_evaluation_with_generator(self) -> None:
-        from fftboost.cli import generate_synthetic_signals
+    def fit(
+        self,
+        i_signal: npt.NDArray,
+        y: npt.NDArray,
+        v_signal: npt.NDArray | None = None,
+    ) -> FFTBoost:
+        v_signal_proc = v_signal if v_signal is not None else np.zeros_like(i_signal)
+        x_fft, x_aux = _extract_features(i_signal, v_signal_proc, self.feature_config)
+        y_trimmed = y[: x_fft.shape[0]]
+        self._fitted_state = _fit_model(
+            x_fft, x_aux, y_trimmed, self.fftboost_config, self.feature_config.fs
+        )
+        self.is_fitted = True
+        return self
 
-        self.results = run_full_cv_evaluation(self.config, generate_synthetic_signals)
-
-    def get_j_beats_telemetry(self) -> JBeatsResult:
-        if self.results is None or self.results["fold_results"] is None:
-            return {
-                "j_beats_pass": False,
-                "mean_delta": -1.0,
-                "ci_low": -1.0,
-                "ci_high": -1.0,
-                "fft_wins": 0,
-                "n_folds": 0,
-            }
-        return calculate_j_beats_gate(self.results["fold_results"])
-
-    def get_m_latency_telemetry(self) -> LatencyResult:
-        budget = self.config.get("latency_budget_ms", 2.0)
-        times: list[float] = []
-        if self.results and self.results["inference_times_ms"]:
-            times = self.results["inference_times_ms"]
-        return calculate_m_latency_gate(times, budget)
-
-
-def load_config_from_yaml(path: str) -> dict[str, Any]:
-    if path.startswith("http://") or path.startswith("https://"):
-        response = requests.get(path)
-        response.raise_for_status()
-        untyped_config = yaml.safe_load(response.text)
-    else:
-        with open(path) as f:
-            untyped_config = yaml.safe_load(f)
-
-    config = cast(dict[str, Any], untyped_config)
-    return config
+    def predict(
+        self, i_signal: npt.NDArray, v_signal: npt.NDArray | None = None
+    ) -> npt.NDArray:
+        if not self.is_fitted:
+            raise RuntimeError(
+                "This FFTBoost instance is not fitted yet. "
+                "Call 'fit' before predicting."
+            )
+        v_signal_proc = v_signal if v_signal is not None else np.zeros_like(i_signal)
+        x_fft, x_aux = _extract_features(i_signal, v_signal_proc, self.feature_config)
+        final_model = self._fitted_state["final_model"]
+        active_atoms = self._fitted_state["active_atoms"]
+        features_to_predict = np.hstack([x_fft[:, active_atoms], x_aux])
+        return final_model.predict(features_to_predict)

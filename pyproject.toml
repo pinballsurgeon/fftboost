@@ -1,68 +1,52 @@
+[project]
+name = "fftboost"
+version = "1.0.0"
+authors = [
+  { name="Your Name", email="your@email.com" },
+]
+description = "A Python library for signal analysis using feature-selecting FFT-based models."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "pywavelets"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "mypy",
+    "ruff",
+    "lightgbm",
+    "xgboost",
+    "catboost",
+    "ipykernel"
+]
+viz = [
+    "matplotlib",
+    "seaborn"
+]
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-[project]
-name = "fftboost"
-version = "0.3.0"
-description = "gradient boosting library with fourier feature selection for time-series analysis and inference"
-readme = "README.md"
-requires-python = ">=3.9"
-license = { text = "Apache-2.0" }
-authors = [
-  { name = "dan ehlers", email = "pinballsurgeon@gmail.com" },
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
-
-dependencies = [
-    "numpy>=1.21.0",
-    "scipy>=1.7.0",
-    "pyyaml>=6.0",
-    "pywavelets>=1.2.0",
-    "scikit-learn>=1.0",
-    "requests"
-]
-
-[project.urls]
-Homepage = "https://github.com/pinballsurgeon/fftboost"
-Issues = "https://github.com/pinballsurgeon/fftboost/issues"
-
-[project.optional-dependencies]
-dev = [
-    "pytest==8.2.2",
-    "ruff==0.5.0",
-    "mypy==1.10.0",
-    "pre-commit==3.7.1",
-    "types-PyYAML==6.0.12.12",
-    "types-requests",
-    "jupyter",
-    "nbconvert"
-]
-
-[project.scripts]
-fftboost = "fftboost.cli:main"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.ruff]
-line-length = 100
+line-length = 88
 
 [tool.ruff.lint]
-select = [
-    "E", "F", "W", "I", "UP",
-]
-ignore = []
-
-[tool.ruff.format]
-quote-style = "double"
+select = ["E", "F", "W", "I", "UP"]
 
 [tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
 strict = true
-ignore_missing_imports = true
-mypy_path = "src"
+explicit_package_bases = true

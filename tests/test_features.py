@@ -1,82 +1,32 @@
-from typing import Any, cast
+from __future__ import annotations
 
 import numpy as np
-from fftboost.core import features
+
+from src.fftboost.config import FeatureConfig
+from src.fftboost.features import _create_windows, _extract_features
 
 
-def test_windowing_output_shape_and_count() -> None:
-    config: dict[str, Any] = {"fs": 1000, "duration_s": 10, "window_s": 0.4, "hop_s": 0.2}
-    signal = np.random.randn(cast(int, config["duration_s"]) * cast(int, config["fs"]))
-    windows = features.create_windows(signal, config)
-
-    win_len = int(cast(float, config["window_s"]) * cast(int, config["fs"]))
-    hop_len = int(cast(float, config["hop_s"]) * cast(int, config["fs"]))
-    expected_n_windows = (len(signal) - win_len) // hop_len + 1
-
-    assert windows.shape == (expected_n_windows, win_len)
+def test_create_windows() -> None:
+    signal = np.arange(100)
+    config = FeatureConfig(fs=10, window_s=2.0, hop_s=1.0)
+    windows = _create_windows(signal, config)
+    assert windows.shape == (9, 20)
+    np.testing.assert_array_equal(windows[0], np.arange(20))
+    np.testing.assert_array_equal(windows[1], np.arange(10, 30))
 
 
-def test_fft_peak_location() -> None:
+def test_extract_features_shapes() -> None:
     fs = 1000
-    win_len = 1000
-    test_freq = 150.0
-    t = np.arange(win_len) / fs
-    signal = np.sin(2 * np.pi * test_freq * t)
-    windows = np.array([signal])
-
-    fft_features, freqs = features.compute_fft(windows, fs, win_len)
-    peak_index = np.argmax(fft_features[0, :])
-    detected_freq = freqs[peak_index]
-
-    assert np.isclose(detected_freq, test_freq, atol=1.0)
-
-
-def test_feature_shapes() -> None:
-    n_windows = 10
-    win_len = 400
-    fs = 1000
-    config: dict[str, Any] = {"wavelet_family": "db4", "wavelet_level": 4}
-    windows = np.random.randn(n_windows, win_len)
-    fft_features = np.random.rand(n_windows, win_len // 2)
-    freqs = np.linspace(0, fs / 2, win_len // 2)
-
-    wavelet_energies = features.compute_wavelet_energies(windows, config)
-    wavelet_level = cast(int, config["wavelet_level"])
-    assert wavelet_energies.shape == (n_windows, wavelet_level + 1)
-
-    hilbert_stats = features.compute_hilbert_phase_stats(windows, fs)
-    assert hilbert_stats.shape == (n_windows, 3)
-
-    spectral_moments = features.compute_spectral_moments(fft_features, freqs)
-    assert spectral_moments.shape == (n_windows, 2)
-
-
-def test_orchestrator_output_shapes() -> None:
-    config: dict[str, Any] = {
-        "fs": 1000,
-        "duration_s": 10,
-        "window_s": 0.4,
-        "hop_s": 0.2,
-        "use_wavelets": True,
-        "wavelet_family": "db4",
-        "wavelet_level": 4,
-        "use_hilbert_phase": True,
-        "coherence_subbands": [[1, 40], [40, 100]],
-    }
-    i_signal = np.random.randn(cast(int, config["duration_s"]) * cast(int, config["fs"]))
-    v_signal = np.random.randn(cast(int, config["duration_s"]) * cast(int, config["fs"]))
-
-    x_fft, x_aux, freqs = features.extract_features_from_signals(i_signal, v_signal, config)
-
-    win_len = int(cast(float, config["window_s"]) * cast(int, config["fs"]))
-    hop_len = int(cast(float, config["hop_s"]) * cast(int, config["fs"]))
-    expected_n_windows = (len(i_signal) - win_len) // hop_len + 1
-    expected_n_fft_bins = win_len // 2
-
-    assert x_fft.shape == (expected_n_windows, expected_n_fft_bins)
-    assert freqs.shape == (expected_n_fft_bins,)
-
-    wavelet_level = cast(int, config["wavelet_level"])
-    coherence_subbands = cast(list[list[int]], config["coherence_subbands"])
-    expected_aux_cols = (wavelet_level + 1) + 3 + 2 + len(coherence_subbands)
-    assert x_aux.shape == (expected_n_windows, expected_aux_cols)
+    signal = np.random.randn(10 * fs)
+    config = FeatureConfig(
+        fs=fs, window_s=0.5, hop_s=0.25, use_wavelets=True, use_hilbert_phase=True
+    )
+    x_fft, x_aux = _extract_features(signal, np.zeros_like(signal), config)
+    win_len = int(config.window_s * fs)
+    hop_len = int(config.hop_s * fs)
+    expected_windows = (len(signal) - win_len) // hop_len + 1
+    assert x_fft.shape[0] == expected_windows
+    assert x_aux.shape[0] == expected_windows
+    assert x_fft.shape[1] == win_len // 2
+    expected_aux_features = config.wavelet_level + 2
+    assert x_aux.shape[1] == expected_aux_features
