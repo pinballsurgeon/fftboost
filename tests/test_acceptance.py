@@ -40,7 +40,7 @@ def test_model_solves_known_problem() -> None:
     model.fit(i_signal, y_target)
     predictions = model.predict(i_signal)
 
-    # 3. ASSERT: Check if the R^2 score meets our acceptance criteria
+    # 3. ASSERT: Check if the R^2 score meets acceptance criteria
     y_trimmed = y_target[: len(predictions)]
 
     corr_matrix = np.corrcoef(y_trimmed, predictions)
