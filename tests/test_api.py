@@ -5,7 +5,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from src.fftboost import FeatureConfig, FFTBoost, FFTBoostConfig
+from src.fftboost import FeatureConfig
+from src.fftboost import FFTBoost
+from src.fftboost import FFTBoostConfig
 
 
 @pytest.fixture  # type: ignore[misc]

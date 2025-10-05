@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.fftboost.scaling import robust_scale, zscale  # CORRECTED IMPORT
+from src.fftboost.scaling import robust_scale  # CORRECTED IMPORT
+from src.fftboost.scaling import zscale  # CORRECTED IMPORT
 
 
 def test_zscale_properties() -> None:

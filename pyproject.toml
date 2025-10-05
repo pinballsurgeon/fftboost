@@ -44,6 +44,11 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
 
+[tool.ruff.lint.isort]
+force-single-line = true
+lines-after-imports = 2
+known-first-party = ["fftboost"]
+
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true

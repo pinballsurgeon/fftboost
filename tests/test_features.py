@@ -3,7 +3,8 @@ from __future__ import annotations
 import numpy as np
 
 from src.fftboost.config import FeatureConfig
-from src.fftboost.features import _create_windows, _extract_features
+from src.fftboost.features import _create_windows
+from src.fftboost.features import _extract_features
 
 
 def test_create_windows() -> None:

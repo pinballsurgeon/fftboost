@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
-from fftboost import FeatureConfig, FFTBoost, FFTBoostConfig
+
+from fftboost import FeatureConfig
+from fftboost import FFTBoost
+from fftboost import FFTBoostConfig
 
 
 def test_model_solves_known_problem() -> None:

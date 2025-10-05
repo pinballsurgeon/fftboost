@@ -5,7 +5,8 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from .config import FeatureConfig, FFTBoostConfig
+from .config import FeatureConfig
+from .config import FFTBoostConfig
 from .features import _extract_features
 from .models import _fit_model
 
