@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import cast
 
 import numpy as np
 
@@ -47,4 +48,4 @@ class FFTBoost:
         final_model = self._fitted_state["final_model"]
         active_atoms = self._fitted_state["active_atoms"]
         features_to_predict = np.hstack([x_fft[:, active_atoms], x_aux])
-        return final_model.predict(features_to_predict)
+        return cast(np.ndarray[Any, Any], final_model.predict(features_to_predict))

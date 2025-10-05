@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import cast
 
 import numpy as np
 import pywt
@@ -18,12 +19,15 @@ def _create_windows(
     n_windows = (signal.shape[0] - win_len) // hop_len + 1
     shape = (n_windows, win_len)
     strides = (signal.strides[0] * hop_len, signal.strides[0])
-    return np.lib.stride_tricks.as_strided(signal, shape=shape, strides=strides)
+    return cast(
+        np.ndarray[Any, Any],
+        np.lib.stride_tricks.as_strided(signal, shape=shape, strides=strides),
+    )
 
 
 def _compute_fft_features(windows: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
     fft_result = rfft(windows, axis=1)
-    return np.abs(fft_result[:, 1:])
+    return cast(np.ndarray[Any, Any], np.abs(fft_result[:, 1:]))
 
 
 def _compute_wavelet_features(
@@ -36,7 +40,7 @@ def _compute_wavelet_features(
         np.sqrt(np.sum(detail_coeffs**2, axis=1, keepdims=True))
         for detail_coeffs in coeffs[1:]
     ]
-    return np.hstack(energies)
+    return cast(np.ndarray[Any, Any], np.hstack(energies))
 
 
 def _compute_hilbert_features(windows: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
@@ -45,7 +49,7 @@ def _compute_hilbert_features(windows: np.ndarray[Any, Any]) -> np.ndarray[Any, 
     instant_freq = np.diff(instant_phase, axis=1)
     mean_freq = np.mean(instant_freq, axis=1, keepdims=True)
     std_freq = np.std(instant_freq, axis=1, keepdims=True)
-    return np.hstack([mean_freq, std_freq])
+    return cast(np.ndarray[Any, Any], np.hstack([mean_freq, std_freq]))
 
 
 def _extract_features(

@@ -1,7 +1,8 @@
-# src\fftboost\core.py
+# src/fftboost/models.py
 from __future__ import annotations
 
 from typing import Any
+from typing import cast
 
 import numpy as np
 from scipy.fft import rfftfreq
@@ -16,7 +17,8 @@ def _calculate_penalties(
     freqs = rfftfreq(n_fft_features * 2, 1 / fs)[1 : n_fft_features + 1]
     hf_penalty = config.lambda_hf * (freqs / (fs / 2))
     coh_penalty = config.lambda_coh * (1 - np.ones(n_fft_features))
-    return hf_penalty + coh_penalty
+
+    return cast(np.ndarray[Any, Any], hf_penalty + coh_penalty)
 
 
 def _fit_model(
