@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
-import numpy.typing as npt
 
 
 def zscale(
-    x: npt.NDArray, mu: float | None = None, sd: float | None = None
-) -> tuple[npt.NDArray, float, float]:
+    x: np.ndarray[Any, Any], mu: float | None = None, sd: float | None = None
+) -> tuple[np.ndarray[Any, Any], float, float]:
     if mu is None:
         mu = float(np.nanmean(x))
     if sd is None:
@@ -17,8 +18,8 @@ def zscale(
 
 
 def robust_scale(
-    x: npt.NDArray, ref: npt.NDArray | None = None
-) -> tuple[npt.NDArray, float, float]:
+    x: np.ndarray[Any, Any], ref: np.ndarray[Any, Any] | None = None
+) -> tuple[np.ndarray[Any, Any], float, float]:
     source = ref if ref is not None else x
     med = float(np.nanmedian(source))
     iqr = float(np.nanquantile(source, 0.75) - np.nanquantile(source, 0.25))

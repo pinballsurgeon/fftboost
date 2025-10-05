@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 
 from .config import FeatureConfig
 from .config import FFTBoostConfig
@@ -20,9 +19,9 @@ class FFTBoost:
 
     def fit(
         self,
-        i_signal: npt.NDArray,
-        y: npt.NDArray,
-        v_signal: npt.NDArray | None = None,
+        i_signal: np.ndarray[Any, Any],
+        y: np.ndarray[Any, Any],
+        v_signal: np.ndarray[Any, Any] | None = None,
     ) -> FFTBoost:
         v_signal_proc = v_signal if v_signal is not None else np.zeros_like(i_signal)
         x_fft, x_aux = _extract_features(i_signal, v_signal_proc, self.feature_config)
@@ -34,8 +33,10 @@ class FFTBoost:
         return self
 
     def predict(
-        self, i_signal: npt.NDArray, v_signal: npt.NDArray | None = None
-    ) -> npt.NDArray:
+        self,
+        i_signal: np.ndarray[Any, Any],
+        v_signal: np.ndarray[Any, Any] | None = None,
+    ) -> np.ndarray[Any, Any]:
         if not self.is_fitted:
             raise RuntimeError(
                 "This FFTBoost instance is not fitted yet. "

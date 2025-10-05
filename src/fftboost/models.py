@@ -1,9 +1,9 @@
+# src\fftboost\core.py
 from __future__ import annotations
 
 from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 from scipy.fft import rfftfreq
 from sklearn.linear_model import Ridge
 
@@ -12,7 +12,7 @@ from .config import FFTBoostConfig
 
 def _calculate_penalties(
     config: FFTBoostConfig, n_fft_features: int, fs: int
-) -> npt.NDArray:
+) -> np.ndarray[Any, Any]:
     freqs = rfftfreq(n_fft_features * 2, 1 / fs)[1 : n_fft_features + 1]
     hf_penalty = config.lambda_hf * (freqs / (fs / 2))
     coh_penalty = config.lambda_coh * (1 - np.ones(n_fft_features))
@@ -20,9 +20,9 @@ def _calculate_penalties(
 
 
 def _fit_model(
-    x_fft: npt.NDArray,
-    x_aux: npt.NDArray,
-    y: npt.NDArray,
+    x_fft: np.ndarray[Any, Any],
+    x_aux: np.ndarray[Any, Any],
+    y: np.ndarray[Any, Any],
     config: FFTBoostConfig,
     fs: int,
 ) -> dict[str, Any]:
