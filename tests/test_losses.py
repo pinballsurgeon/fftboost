@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Callable
+from typing import cast
 
 import numpy as np
 
@@ -23,13 +24,13 @@ def _finite_difference_grad(
         lp = loss_fn(y_true, y_pred + e)
         lm = loss_fn(y_true, y_pred - e)
         approx[i] = (lp - lm) / (2.0 * eps)
-    return approx
+    return cast(np.ndarray, approx)
 
 
 def _assert_grad_close(analytical: np.ndarray, numerical: np.ndarray) -> None:
     # Relative L2 error with absolute fallback near zero
-    num = np.linalg.norm(analytical - numerical)
-    den = max(np.linalg.norm(analytical), 1e-12)
+    num = float(np.linalg.norm(analytical - numerical))
+    den = max(float(np.linalg.norm(analytical)), 1e-12)
     rel = num / den
     assert rel < 1e-6, f"relative error too large: {rel}"
 
