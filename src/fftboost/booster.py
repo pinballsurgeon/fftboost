@@ -45,8 +45,8 @@ class Booster:
 
     def fit(
         self,
-        signal: np.ndarray,
-        y: np.ndarray,
+        signal: np.ndarray[Any, Any],
+        y: np.ndarray[Any, Any],
         *,
         fs: float,
         window_s: float,
@@ -101,7 +101,7 @@ class Booster:
         patience = self.cfg.early_stopping_rounds
 
         # Prepare optional band edges
-        band_edges_arr: np.ndarray | None = None
+        band_edges_arr: np.ndarray[Any, Any] | None = None
         if self.cfg.default_band_edges_hz is not None:
             edges = np.array(self.cfg.default_band_edges_hz, dtype=np.float64)
             if edges.ndim == 2 and edges.shape[1] == 2:
@@ -187,7 +187,7 @@ class Booster:
         if self.freqs is not None and self.freqs.shape == freqs.shape:
             same_grid = np.allclose(self.freqs, freqs)
 
-        def nearest_index(fgrid: np.ndarray, f: float) -> int:
+        def nearest_index(fgrid: np.ndarray[Any, Any], f: float) -> int:
             i = int(np.searchsorted(fgrid, f, side="left"))
             if i <= 0:
                 return 0
@@ -197,7 +197,7 @@ class Booster:
 
         for record in records:
             # Reconstruct H from descriptors without searching
-            cols: list[np.ndarray] = []
+            cols: list[np.ndarray[Any, Any]] = []
             for d in record.descriptors:
                 if d.get("type") == "fft_bin":
                     if same_grid:
@@ -209,7 +209,7 @@ class Booster:
                 elif d.get("type") == "sk_band":
                     band = cast(tuple[float, float], d["band_hz"])
                     lo, hi = float(band[0]), float(band[1])
-                    mask = (freqs >= lo) & (freqs <= hi)
+                    mask = (freqs >= lo) & (freqs < hi)
                     cols.append(
                         psd[:, mask].sum(axis=1)
                         if mask.any()
@@ -220,7 +220,7 @@ class Booster:
                 continue
             Z = (H - record.mu) / (record.sigma + 1e-12)
             y_pred += record.nu * record.gamma * (Z @ record.weights)
-        return cast(np.ndarray, y_pred)
+        return y_pred
 
     @property
     def artifact(self) -> BoosterArtifact:
