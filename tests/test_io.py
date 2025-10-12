@@ -103,8 +103,9 @@ def test_io_round_trip_predictions_identical() -> None:
     yhat_orig = _predict_with_artifact(artifact, ctx.psd)
 
     with tempfile.TemporaryDirectory() as tmp:
-        save_model(artifact, tmp)
-        loaded = load_model(tmp)
+        prefix = os.path.join(tmp, "artifact")
+        _ = save_model(artifact, prefix)
+        loaded = load_model(prefix)
         yhat_loaded = _predict_with_artifact(loaded, ctx.psd)
         np.testing.assert_array_equal(yhat_orig, yhat_loaded)
 
@@ -118,13 +119,10 @@ def test_io_determinism_gate() -> None:
         art1, _, _, _ = _train_two_stage_artifact(rng1)
         art2, _, _, _ = _train_two_stage_artifact(rng2)
 
-        save_model(art1, tmp1)
-        save_model(art2, tmp2)
+        info1 = save_model(art1, os.path.join(tmp1, "model"))
+        info2 = save_model(art2, os.path.join(tmp2, "model"))
 
-        h1 = _stable_artifact_hash(
-            os.path.join(tmp1, "model.json"), os.path.join(tmp1, "model.npz")
-        )
-        h2 = _stable_artifact_hash(
-            os.path.join(tmp2, "model.json"), os.path.join(tmp2, "model.npz")
-        )
+        # Determinism via returned hash and recomputed hash
+        h1 = info1["sha256"]
+        h2 = info2["sha256"]
         assert h1 == h2

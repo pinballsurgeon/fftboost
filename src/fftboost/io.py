@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -20,29 +21,41 @@ class BoosterArtifact:
     config: dict[str, Any] | None = None
 
 
-def save_model(artifact: BoosterArtifact, path_prefix: str) -> None:
+def _stable_json_dumps(obj: dict[str, Any]) -> str:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"))
+
+
+def _hash_meta_and_arrays(meta: dict[str, Any], arrays: dict[str, np.ndarray]) -> str:
+    h = hashlib.sha256()
+    h.update(_stable_json_dumps(meta).encode("utf-8"))
+    for name in sorted(arrays.keys()):
+        arr = arrays[name]
+        h.update(name.encode("utf-8"))
+        h.update(hashlib.sha256(arr.tobytes(order="C")).digest())
+        h.update(str(arr.shape).encode("utf-8"))
+        h.update(str(arr.dtype).encode("utf-8"))
+    return h.hexdigest()
+
+
+def save_model(artifact: BoosterArtifact, path_prefix: str) -> dict[str, str]:
     """
-    Save artifact to path_prefix/model.json and path_prefix/model.npz.
-    Arrays are stored in NPZ; JSON stores metadata and NPZ keys.
+    Save artifact to path_prefix.json and path_prefix.npz.
+    Returns dict with paths and deterministic sha256 over meta+arrays.
     """
-    os.makedirs(path_prefix, exist_ok=True)
-    json_path = os.path.join(path_prefix, "model.json")
-    npz_path = os.path.join(path_prefix, "model.npz")
+    os.makedirs(os.path.dirname(path_prefix) or ".", exist_ok=True)
+    json_path = f"{path_prefix}.json"
+    npz_path = f"{path_prefix}.npz"
 
     arrays: dict[str, np.ndarray] = {"freqs": artifact.freqs}
     stages_json: list[dict[str, Any]] = []
     for i, s in enumerate(artifact.stages):
-        w_key = f"s{i}_weights"
-        mu_key = f"s{i}_mu"
-        sd_key = f"s{i}_sigma"
-        arrays[w_key] = s.weights
-        arrays[mu_key] = s.mu
-        arrays[sd_key] = s.sigma
+        keys = {"weights": f"s{i}_weights", "mu": f"s{i}_mu", "sigma": f"s{i}_sigma"}
+        arrays[keys["weights"]] = s.weights
+        arrays[keys["mu"]] = s.mu
+        arrays[keys["sigma"]] = s.sigma
         stages_json.append(
             {
-                "weights_key": w_key,
-                "mu_key": mu_key,
-                "sigma_key": sd_key,
+                "keys": keys,
                 "gamma": float(s.gamma),
                 "ridge_alpha": float(s.ridge_alpha),
                 "nu": float(s.nu),
@@ -50,7 +63,7 @@ def save_model(artifact: BoosterArtifact, path_prefix: str) -> None:
             }
         )
 
-    meta = {
+    meta: dict[str, Any] = {
         "schema_version": artifact.schema_version,
         "fftboost_version": artifact.fftboost_version,
         "config": artifact.config or {},
@@ -58,32 +71,34 @@ def save_model(artifact: BoosterArtifact, path_prefix: str) -> None:
         "stages": stages_json,
     }
 
-    # Stable JSON formatting
-    with open(json_path, "w", encoding="utf-8") as f:
-        f.write(json.dumps(meta, sort_keys=True, separators=(",", ":")))
+    sha256 = _hash_meta_and_arrays(meta, arrays)
 
-    # Save arrays; order of fields is deterministic due to Python 3.7+ dict order
-    _save_func: Any = np.savez
-    _save_func(npz_path, **arrays)
+    with open(json_path, "w", encoding="utf-8") as f:
+        f.write(_stable_json_dumps(meta))
+
+    _savez: Any = np.savez_compressed
+    _savez(npz_path, **arrays)
+    return {"json_path": json_path, "npz_path": npz_path, "sha256": sha256}
 
 
 def load_model(path_prefix: str) -> BoosterArtifact:
     """
-    Load artifact from path_prefix/model.json and path_prefix/model.npz.
+    Load artifact from path_prefix.json and path_prefix.npz.
     """
-    json_path = os.path.join(path_prefix, "model.json")
-    npz_path = os.path.join(path_prefix, "model.npz")
+    json_path = f"{path_prefix}.json"
+    npz_path = f"{path_prefix}.npz"
 
     with open(json_path, encoding="utf-8") as f:
-        meta = json.loads(f.read())
+        meta = json.load(f)
 
     with np.load(npz_path) as z:
         freqs = cast(np.ndarray, z["freqs"])  # freq vector
         stages: list[StageRecord] = []
-        for i, s_meta in enumerate(cast(list[dict[str, Any]], meta["stages"])):
-            w = cast(np.ndarray, z[s_meta["weights_key"]])
-            mu = cast(np.ndarray, z[s_meta["mu_key"]])
-            sigma = cast(np.ndarray, z[s_meta["sigma_key"]])
+        for s_meta in cast(list[dict[str, Any]], meta["stages"]):
+            keys = cast(dict[str, str], s_meta["keys"])
+            w = cast(np.ndarray, z[keys["weights"]])
+            mu = cast(np.ndarray, z[keys["mu"]])
+            sigma = cast(np.ndarray, z[keys["sigma"]])
             stages.append(
                 StageRecord(
                     weights=w,
