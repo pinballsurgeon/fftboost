@@ -1,8 +1,7 @@
 __version__ = "1.0.0"
 
 from .api import FFTBoost
-from .config import FeatureConfig
-from .config import FFTBoostConfig
+from .booster import BoosterConfig
 
 
-__all__ = ["FFTBoost", "FFTBoostConfig", "FeatureConfig"]
+__all__ = ["FFTBoost", "BoosterConfig"]
