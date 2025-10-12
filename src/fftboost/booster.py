@@ -181,7 +181,7 @@ class Booster:
         freqs: np.ndarray[Any, Any],
         records: Sequence[StageRecord],
     ) -> np.ndarray[Any, Any]:
-        y_pred = np.zeros(psd.shape[0], dtype=np.float64)
+        y_pred: np.ndarray[Any, Any] = np.zeros(psd.shape[0], dtype=np.float64)
         # Compare prediction grid with training grid
         same_grid = False
         if self.freqs is not None and self.freqs.shape == freqs.shape:
