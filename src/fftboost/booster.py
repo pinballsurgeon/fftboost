@@ -40,7 +40,7 @@ class Booster:
     def __init__(self, cfg: BoosterConfig):
         self.cfg = cfg
         self.stages: list[StageRecord] = []
-        self.freqs: np.ndarray | None = None
+        self.freqs: np.ndarray[Any, Any] | None = None
         self.best_iteration_: int = -1
 
     def fit(
@@ -160,8 +160,8 @@ class Booster:
         return self
 
     def predict(
-        self, signal: np.ndarray, *, fs: float, window_s: float, hop_s: float
-    ) -> np.ndarray:
+        self, signal: np.ndarray[Any, Any], *, fs: float, window_s: float, hop_s: float
+    ) -> np.ndarray[Any, Any]:
         if self.freqs is None:
             raise RuntimeError("Booster is not fitted")
         win_len = int(window_s * fs)
@@ -176,8 +176,11 @@ class Booster:
         return self._predict(psd, pred_freqs, self.stages)
 
     def _predict(
-        self, psd: np.ndarray, freqs: np.ndarray, records: Sequence[StageRecord]
-    ) -> np.ndarray:
+        self,
+        psd: np.ndarray[Any, Any],
+        freqs: np.ndarray[Any, Any],
+        records: Sequence[StageRecord],
+    ) -> np.ndarray[Any, Any]:
         y_pred = np.zeros(psd.shape[0], dtype=np.float64)
         # Compare prediction grid with training grid
         same_grid = False

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from typing import Any
 
 import numpy as np
 
 
 def blocked_cv(
     n_windows: int, n_splits: int, gap: int = 0
-) -> Generator[tuple[np.ndarray, np.ndarray], None, None]:
+) -> Generator[tuple[np.ndarray[Any, Any], np.ndarray[Any, Any]], None, None]:
     """
     Yield (train_indices, validation_indices) for leak-safe blocked CV.
 

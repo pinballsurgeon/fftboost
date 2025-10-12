@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from typing import cast
 from typing import final
 
@@ -19,14 +20,18 @@ class SquaredLoss:
       dL/dy_pred = (y_pred - y_true) / n
     """
 
-    def __call__(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    def __call__(
+        self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
+    ) -> float:
         r = y_pred - y_true
         return float(0.5 * np.mean(r * r))
 
-    def gradient(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+    def gradient(
+        self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
+    ) -> np.ndarray[Any, Any]:
         n = float(y_true.shape[0])
         r = y_pred - y_true
-        return cast(np.ndarray, (r / n).astype(np.float64, copy=False))
+        return cast(np.ndarray[Any, Any], (r / n).astype(np.float64, copy=False))
 
 
 @final
@@ -51,7 +56,9 @@ class HuberLoss:
         if not (self.delta > 0.0):
             raise ValueError("delta must be > 0")
 
-    def __call__(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    def __call__(
+        self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
+    ) -> float:
         r = y_pred - y_true
         abs_r = np.abs(r)
         quad = 0.5 * (r * r)
@@ -59,12 +66,14 @@ class HuberLoss:
         loss = np.where(abs_r <= self.delta, quad, lin)
         return float(np.mean(loss))
 
-    def gradient(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+    def gradient(
+        self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
+    ) -> np.ndarray[Any, Any]:
         n = float(y_true.shape[0])
         r = y_pred - y_true
         abs_r = np.abs(r)
         grad = np.where(abs_r <= self.delta, r, self.delta * np.sign(r))
-        return cast(np.ndarray, (grad / n).astype(np.float64, copy=False))
+        return cast(np.ndarray[Any, Any], (grad / n).astype(np.float64, copy=False))
 
 
 @final
@@ -89,14 +98,18 @@ class QuantileLoss:
         if not (0.0 < self.alpha < 1.0):
             raise ValueError("alpha must be in (0, 1)")
 
-    def __call__(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    def __call__(
+        self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
+    ) -> float:
         r = y_pred - y_true
         # Proper pinball loss with residual r = y_pred - y_true
         loss = np.maximum((1.0 - self.alpha) * r, -self.alpha * r)
         return float(np.mean(loss))
 
-    def gradient(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+    def gradient(
+        self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
+    ) -> np.ndarray[Any, Any]:
         n = float(y_true.shape[0])
         # Deterministic subgradient at r == 0 via y_true comparison
         grad = -np.where(y_true > y_pred, self.alpha, self.alpha - 1.0)
-        return cast(np.ndarray, (grad / n).astype(np.float64, copy=False))
+        return cast(np.ndarray[Any, Any], (grad / n).astype(np.float64, copy=False))

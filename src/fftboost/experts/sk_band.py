@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from typing import cast
 
 import numpy as np
@@ -8,18 +9,18 @@ from .types import ExpertContext
 from .types import Proposal
 
 
-def _vectorized_excess_kurtosis(x: np.ndarray) -> np.ndarray:
+def _vectorized_excess_kurtosis(x: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
     mu = x.mean(axis=0, keepdims=True)
     xc = x - mu
     var = (xc * xc).mean(axis=0, keepdims=True)
     m4 = (xc**4).mean(axis=0, keepdims=True)
     with np.errstate(divide="ignore", invalid="ignore"):
         kurt = np.nan_to_num(m4 / (var**2 + 1e-12)) - 3.0
-    return cast(np.ndarray, kurt.squeeze())
+    return cast(np.ndarray[Any, Any], kurt.squeeze())
 
 
 def propose(
-    residual: np.ndarray,
+    residual: np.ndarray[Any, Any],
     ctx: ExpertContext,
     *,
     n_select: int = 1,
@@ -38,7 +39,7 @@ def propose(
         )
 
     edges = ctx.band_edges_hz
-    band_cols: list[np.ndarray] = []
+    band_cols: list[np.ndarray[Any, Any]] = []
     descriptors: list[dict[str, object]] = []
     for i in range(len(edges) - 1):
         lo, hi = edges[i], edges[i + 1]

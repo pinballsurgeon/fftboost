@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from .types import ExpertContext
 from .types import Proposal
 
 
-def propose(residual: np.ndarray, ctx: ExpertContext, *, top_k: int = 5) -> Proposal:
+def propose(
+    residual: np.ndarray[Any, Any], ctx: ExpertContext, *, top_k: int = 5
+) -> Proposal:
     """
     Proposes top-K FFT bins by correlation with the residual, applying priors.
     """

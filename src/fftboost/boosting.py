@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from typing import cast
 
 import numpy as np
@@ -17,10 +18,10 @@ class StageRecord:
     the original proposals and inputs.
     """
 
-    weights: np.ndarray  # shape: (n_features,)
+    weights: np.ndarray[Any, Any]  # shape: (n_features,)
     descriptors: list[dict[str, object]]
-    mu: np.ndarray  # per-feature means used for z-scoring
-    sigma: np.ndarray  # per-feature stds used for z-scoring
+    mu: np.ndarray[Any, Any]  # per-feature means used for z-scoring
+    sigma: np.ndarray[Any, Any]  # per-feature stds used for z-scoring
     gamma: float  # 1D line-search scalar
     ridge_alpha: float
     nu: float
@@ -28,7 +29,12 @@ class StageRecord:
 
 def _concat_proposals(
     proposals: list[Proposal],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[dict[str, object]]]:
+) -> tuple[
+    np.ndarray[Any, Any],
+    np.ndarray[Any, Any],
+    np.ndarray[Any, Any],
+    list[dict[str, object]],
+]:
     """
     Stack proposal matrices column-wise, and concatenate mu/sigma and descriptors.
     Returns (H, mu, sigma, descriptors).
@@ -51,16 +57,18 @@ def _concat_proposals(
     H = np.hstack(H_list) if len(H_list) > 1 else H_list[0]
     mu = np.hstack(mu_list) if len(mu_list) > 1 else mu_list[0]
     sigma = np.hstack(sigma_list) if len(sigma_list) > 1 else sigma_list[0]
-    return cast(np.ndarray, H), cast(np.ndarray, mu), cast(np.ndarray, sigma), desc_list
+    return H, mu, sigma, desc_list
 
 
-def _ridge_fit_via_cholesky(Z: np.ndarray, r: np.ndarray, alpha: float) -> np.ndarray:
+def _ridge_fit_via_cholesky(
+    Z: np.ndarray[Any, Any], r: np.ndarray[Any, Any], alpha: float
+) -> np.ndarray[Any, Any]:
     """
     Solve (Z^T Z + alpha I) w = Z^T r via Cholesky.
     """
     n_features = Z.shape[1]
     if n_features == 0:
-        return cast(np.ndarray, np.empty((0,), dtype=np.float64))
+        return np.empty((0,), dtype=np.float64)
 
     G = Z.T @ Z
     # Add ridge on the diagonal
@@ -72,15 +80,15 @@ def _ridge_fit_via_cholesky(Z: np.ndarray, r: np.ndarray, alpha: float) -> np.nd
     z = np.linalg.solve(L, y)
     # Solve L^T w = z
     w = np.linalg.solve(L.T, z)
-    return cast(np.ndarray, w)
+    return cast(np.ndarray[Any, Any], w)
 
 
 def fit_stage(
-    residual: np.ndarray,
+    residual: np.ndarray[Any, Any],
     proposals: list[Proposal],
     ridge_alpha: float,
     nu: float,
-) -> tuple[np.ndarray, StageRecord]:
+) -> tuple[np.ndarray[Any, Any], StageRecord]:
     """
     Fit a single boosting stage against the residual using expert proposals.
 

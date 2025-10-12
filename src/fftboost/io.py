@@ -16,7 +16,7 @@ from .boosting import StageRecord
 class BoosterArtifact:
     schema_version: str
     fftboost_version: str
-    freqs: np.ndarray
+    freqs: np.ndarray[Any, Any]
     stages: list[StageRecord]
     config: dict[str, Any] | None = None
 
@@ -25,7 +25,9 @@ def _stable_json_dumps(obj: dict[str, Any]) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
 
-def _hash_meta_and_arrays(meta: dict[str, Any], arrays: dict[str, np.ndarray]) -> str:
+def _hash_meta_and_arrays(
+    meta: dict[str, Any], arrays: dict[str, np.ndarray[Any, Any]]
+) -> str:
     h = hashlib.sha256()
     h.update(_stable_json_dumps(meta).encode("utf-8"))
     for name in sorted(arrays.keys()):
@@ -46,7 +48,7 @@ def save_model(artifact: BoosterArtifact, path_prefix: str) -> dict[str, str]:
     json_path = f"{path_prefix}.json"
     npz_path = f"{path_prefix}.npz"
 
-    arrays: dict[str, np.ndarray] = {"freqs": artifact.freqs}
+    arrays: dict[str, np.ndarray[Any, Any]] = {"freqs": artifact.freqs}
     stages_json: list[dict[str, Any]] = []
     for i, s in enumerate(artifact.stages):
         keys = {"weights": f"s{i}_weights", "mu": f"s{i}_mu", "sigma": f"s{i}_sigma"}
@@ -92,13 +94,13 @@ def load_model(path_prefix: str) -> BoosterArtifact:
         meta = json.load(f)
 
     with np.load(npz_path) as z:
-        freqs = cast(np.ndarray, z["freqs"])  # freq vector
+        freqs = cast(np.ndarray[Any, Any], z["freqs"])  # freq vector
         stages: list[StageRecord] = []
         for s_meta in cast(list[dict[str, Any]], meta["stages"]):
             keys = cast(dict[str, str], s_meta["keys"])
-            w = cast(np.ndarray, z[keys["weights"]])
-            mu = cast(np.ndarray, z[keys["mu"]])
-            sigma = cast(np.ndarray, z[keys["sigma"]])
+            w = cast(np.ndarray[Any, Any], z[keys["weights"]])
+            mu = cast(np.ndarray[Any, Any], z[keys["mu"]])
+            sigma = cast(np.ndarray[Any, Any], z[keys["sigma"]])
             stages.append(
                 StageRecord(
                     weights=w,

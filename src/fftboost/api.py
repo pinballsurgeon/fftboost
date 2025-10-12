@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any
-from typing import cast
 
 import numpy as np
 
@@ -55,14 +54,8 @@ class FFTBoost:
                 "Call 'fit' before predicting."
             )
             raise RuntimeError(msg)
-        return cast(
-            np.ndarray[Any, Any],
-            self._booster.predict(
-                signal.astype(np.float64),
-                fs=fs,
-                window_s=window_s,
-                hop_s=hop_s,
-            ),
+        return self._booster.predict(
+            signal.astype(np.float64), fs=fs, window_s=window_s, hop_s=hop_s
         )
 
     # Convenience persistence
