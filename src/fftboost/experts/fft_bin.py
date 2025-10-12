@@ -55,6 +55,9 @@ def propose(residual: np.ndarray, ctx: ExpertContext, *, top_k: int = 5) -> Prop
     H = psd[:, top_indices]
     mu = psd_mu[top_indices]
     sigma = psd_std[top_indices]
-    descriptors = [{"type": "fft_bin", "freq_hz": float(freqs[i])} for i in top_indices]
+    descriptors = [
+        {"type": "fft_bin", "freq_hz": float(freqs[i]), "bin": int(i)}
+        for i in top_indices
+    ]
 
     return Proposal(H=H, descriptors=descriptors, mu=mu, sigma=sigma)

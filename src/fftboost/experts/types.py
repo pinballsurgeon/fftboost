@@ -13,6 +13,7 @@ class ExpertContext:
     min_sep_bins: int
     lambda_hf: float
     selected_bins: np.ndarray | None = None  # shape: (k,), int64 or None
+    band_edges_hz: np.ndarray | None = None  # optional band edges for sk_band
 
 
 @dataclass(frozen=True)
