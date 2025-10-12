@@ -172,18 +172,37 @@ class Booster:
         strides = (signal.strides[0] * hop, signal.strides[0])
         windows = np.lib.stride_tricks.as_strided(signal, shape=shape, strides=strides)
         psd = np.abs(np.fft.rfft(windows, axis=1))[:, 1:]
-        return self._predict(psd, self.freqs, self.stages)
+        pred_freqs = np.fft.rfftfreq(win_len, d=1.0 / fs)[1:]
+        return self._predict(psd, pred_freqs, self.stages)
 
     def _predict(
         self, psd: np.ndarray, freqs: np.ndarray, records: Sequence[StageRecord]
     ) -> np.ndarray:
         y_pred = np.zeros(psd.shape[0], dtype=np.float64)
+        # Compare prediction grid with training grid
+        same_grid = False
+        if self.freqs is not None and self.freqs.shape == freqs.shape:
+            same_grid = np.allclose(self.freqs, freqs)
+
+        def nearest_index(fgrid: np.ndarray, f: float) -> int:
+            i = int(np.searchsorted(fgrid, f, side="left"))
+            if i <= 0:
+                return 0
+            if i >= fgrid.size:
+                return int(fgrid.size - 1)
+            return int(i - 1 if abs(f - fgrid[i - 1]) <= abs(fgrid[i] - f) else i)
+
         for record in records:
             # Reconstruct H from descriptors without searching
             cols: list[np.ndarray] = []
             for d in record.descriptors:
                 if d.get("type") == "fft_bin":
-                    cols.append(psd[:, int(cast(int, d["bin"]))])
+                    if same_grid:
+                        cols.append(psd[:, int(cast(int, d["bin"]))])
+                    else:
+                        f = float(cast(float, d["freq_hz"]))
+                        idx = nearest_index(freqs, f)
+                        cols.append(psd[:, idx])
                 elif d.get("type") == "sk_band":
                     band = cast(tuple[float, float], d["band_hz"])
                     lo, hi = float(band[0]), float(band[1])

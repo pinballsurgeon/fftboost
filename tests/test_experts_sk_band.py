@@ -44,23 +44,17 @@ def test_signal_recovery_sk_band_identifies_impulse_band() -> None:
     )
     # fs not used by sk_band, but ExpertContext requires it
     fs = 2.0 * float(freqs.max())  # Nyquist maps to max(freqs)
-    ctx = ExpertContext(psd=psd, freqs=freqs, fs=fs, min_sep_bins=0, lambda_hf=0.0)
-    proposal = skband_propose(
-        residual,
-        ctx,
-        bands=bands,
-        top_m=1,
-        boost_kurtosis=True,
-        kurtosis_weight=0.5,
+    # Use only the target band edges to avoid unintended sub-band splits
+    edges = np.array([bands[0][0], bands[0][1]], dtype=np.float64)
+    ctx = ExpertContext(
+        psd=psd, freqs=freqs, fs=fs, min_sep_bins=0, lambda_hf=0.0, band_edges_hz=edges
     )
+    proposal = skband_propose(residual, ctx, n_select=1, kurtosis_boost=0.5)
     assert proposal.H.shape == (n_windows, 1)
     top_desc = proposal.descriptors[0]
     assert top_desc["type"] == "sk_band"
     # Should pick the target band (lo,hi) in Hz
-    picked = (
-        cast(float, top_desc["low_hz"]),
-        cast(float, top_desc["high_hz"]),
-    )
+    picked = cast(tuple[float, float], top_desc["band_hz"])
     true_band_hz = (float(target_band[0] + 1), float(target_band[1] + 1))
     assert picked == true_band_hz
 
@@ -75,16 +69,15 @@ def test_performance_sk_band_throughput() -> None:
         n_windows, n_bins, target_band, impulse_windows, rng
     )
     fs = 2.0 * float(freqs.max())
-    ctx = ExpertContext(psd=psd, freqs=freqs, fs=fs, min_sep_bins=0, lambda_hf=0.0)
+    edges = np.unique(
+        np.array(bands + [(1.0, 5.0), (90.0, 100.0)], dtype=np.float64).reshape(-1)
+    )
+    ctx = ExpertContext(
+        psd=psd, freqs=freqs, fs=fs, min_sep_bins=0, lambda_hf=0.0, band_edges_hz=edges
+    )
 
     t0 = time.perf_counter()
-    _ = skband_propose(
-        residual,
-        ctx,
-        bands=bands + [(1.0, 5.0), (90.0, 100.0)],
-        top_m=2,
-        boost_kurtosis=True,
-    )
+    _ = skband_propose(residual, ctx, n_select=2, kurtosis_boost=0.5)
     elapsed = time.perf_counter() - t0
     throughput = n_windows / max(elapsed, 1e-9)
     assert throughput > 20000.0
@@ -100,9 +93,12 @@ def test_determinism_sk_band() -> None:
         n_windows, n_bins, target_band, impulse_windows, rng
     )
     fs = 2.0 * float(freqs.max())
-    ctx = ExpertContext(psd=psd, freqs=freqs, fs=fs, min_sep_bins=0, lambda_hf=0.0)
-    p1 = skband_propose(residual, ctx, bands=bands, top_m=3, boost_kurtosis=True)
-    p2 = skband_propose(residual, ctx, bands=bands, top_m=3, boost_kurtosis=True)
+    edges = np.unique(np.array(bands, dtype=np.float64).reshape(-1))
+    ctx = ExpertContext(
+        psd=psd, freqs=freqs, fs=fs, min_sep_bins=0, lambda_hf=0.0, band_edges_hz=edges
+    )
+    p1 = skband_propose(residual, ctx, n_select=3, kurtosis_boost=0.2)
+    p2 = skband_propose(residual, ctx, n_select=3, kurtosis_boost=0.2)
     np.testing.assert_array_equal(p1.H, p2.H)
     assert p1.descriptors == p2.descriptors
     np.testing.assert_allclose(p1.mu, p2.mu)
