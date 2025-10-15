@@ -44,6 +44,13 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Relax linting in notebooks while keeping strict checks elsewhere.
+# Ignore import sorting, long lines, module-level imports in cells,
+# unused imports (often used for demos), and multi-statement lines.
+"notebooks/*.ipynb" = ["I001", "E501", "E402", "F401", "E702"]
+"notebooks/**/*.ipynb" = ["I001", "E501", "E402", "F401", "E702"]
+
 [tool.ruff.lint.isort]
 force-single-line = true
 lines-after-imports = 2
