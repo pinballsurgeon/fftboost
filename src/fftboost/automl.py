@@ -59,54 +59,81 @@ class AutoMLConfig:
     # Classification expert search
     clf_ks: tuple[int, ...] = (2, 4, 6)
     clf_methods: tuple[Literal["fscore", "mi"], ...] = ("fscore",)
+    # Temporal expert search
+    temporal_ks: tuple[int, ...] = (2, 4)
+    temporal_lag_sets: tuple[tuple[int, ...], ...] = ((1,), (1, 2, 3))
 
 
 class AutoMLController:
     def __init__(self, cfg: AutoMLConfig | None = None):
         self.cfg = cfg or AutoMLConfig()
 
-    def _candidates(self, task: TaskType) -> list[BoosterConfig]:
+    def _candidates(
+        self, task: TaskType, n_windows: int, n_bins: int
+    ) -> list[BoosterConfig]:
         out: list[BoosterConfig] = []
         for nu in self.cfg.nus:
             for st in self.cfg.stages:
                 for k in self.cfg.k_ffts:
                     for sep in self.cfg.min_sep_bins:
                         if task == "binary":
+                            # Adaptive MI gating: only include MI for modest sizes
+                            methods: tuple[Literal["fscore", "mi"], ...]
+                            if (
+                                n_bins <= 2000 and n_windows <= 20000
+                            ) and self.cfg.clf_methods:
+                                methods = self.cfg.clf_methods
+                            else:
+                                methods = ("fscore",)
                             for ck in self.cfg.clf_ks:
-                                for cm in self.cfg.clf_methods:
-                                    out.append(
-                                        BoosterConfig(
-                                            n_stages=st,
-                                            nu=nu,
-                                            ridge_alpha=1e-3,
-                                            early_stopping_rounds=10,
-                                            loss=cast(Any, "logistic"),
-                                            huber_delta=1.0,
-                                            quantile_alpha=0.5,
-                                            k_fft=k,
-                                            min_sep_bins=sep,
-                                            lambda_hf=0.0,
-                                            clf_use=True,
-                                            clf_k=int(ck),
-                                            clf_method=cast(Any, cm),
-                                        )
-                                    )
+                                for cm in methods:
+                                    for tk in self.cfg.temporal_ks:
+                                        for lset in self.cfg.temporal_lag_sets:
+                                            out.append(
+                                                BoosterConfig(
+                                                    n_stages=st,
+                                                    nu=nu,
+                                                    ridge_alpha=1e-3,
+                                                    early_stopping_rounds=10,
+                                                    loss=cast(Any, "logistic"),
+                                                    huber_delta=1.0,
+                                                    quantile_alpha=0.5,
+                                                    k_fft=k,
+                                                    min_sep_bins=sep,
+                                                    lambda_hf=0.0,
+                                                    clf_use=True,
+                                                    clf_k=int(ck),
+                                                    clf_method=cast(Any, cm),
+                                                    temporal_use=True,
+                                                    temporal_k=int(tk),
+                                                    temporal_lags=tuple(
+                                                        int(x) for x in lset
+                                                    ),
+                                                )
+                                            )
                         else:
                             for loss in ("huber", "squared"):
-                                out.append(
-                                    BoosterConfig(
-                                        n_stages=st,
-                                        nu=nu,
-                                        ridge_alpha=1e-3,
-                                        early_stopping_rounds=10,
-                                        loss=cast(Any, loss),
-                                        huber_delta=1.0,
-                                        quantile_alpha=0.5,
-                                        k_fft=k,
-                                        min_sep_bins=sep,
-                                        lambda_hf=0.0,
-                                    )
-                                )
+                                for tk in self.cfg.temporal_ks:
+                                    for lset in self.cfg.temporal_lag_sets:
+                                        out.append(
+                                            BoosterConfig(
+                                                n_stages=st,
+                                                nu=nu,
+                                                ridge_alpha=1e-3,
+                                                early_stopping_rounds=10,
+                                                loss=cast(Any, loss),
+                                                huber_delta=1.0,
+                                                quantile_alpha=0.5,
+                                                k_fft=k,
+                                                min_sep_bins=sep,
+                                                lambda_hf=0.0,
+                                                temporal_use=True,
+                                                temporal_k=int(tk),
+                                                temporal_lags=tuple(
+                                                    int(x) for x in lset
+                                                ),
+                                            )
+                                        )
         # Limit to n_configs deterministically
         return out[: self.cfg.n_configs]
 
@@ -132,8 +159,10 @@ class AutoMLController:
         best_model: object | None = None
         best_config: BoosterConfig | None = None
 
-        # Build candidate list
-        cand_cfgs = self._candidates(task)
+        # Build candidate list (adaptive to problem size)
+        win_len = int(window_s * fs)
+        n_bins = int(win_len // 2)
+        cand_cfgs = self._candidates(task, n_win, n_bins)
 
         # Successive halving over budgets
         # Determine per-round budgets

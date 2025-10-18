@@ -13,6 +13,8 @@ from .boosting import fit_stage
 from .experts.clf_bin import propose as clf_bin_propose
 from .experts.fft_bin import propose as fftbin_propose
 from .experts.sk_band import propose as sk_band_propose
+from .experts.temporal import propose_flux as temporal_flux_propose
+from .experts.temporal import propose_lagstack as temporal_lagstack_propose
 from .experts.types import ExpertContext
 from .io import BoosterArtifact
 from .losses import HuberLoss
@@ -40,6 +42,10 @@ class BoosterConfig:
     clf_use: bool = True
     clf_k: int = 4
     clf_method: Literal["fscore", "mi"] = "fscore"
+    # Temporal experts
+    temporal_use: bool = True
+    temporal_k: int = 4
+    temporal_lags: tuple[int, ...] = (1, 2, 3)
 
 
 class Booster:
@@ -153,6 +159,25 @@ class Booster:
                         method=self.cfg.clf_method,
                     )
                 )
+            # Temporal experts (operate on window dynamics)
+            if self.cfg.temporal_use:
+                proposals.append(
+                    temporal_flux_propose(
+                        residual,
+                        ctx,
+                        top_k=self.cfg.temporal_k,
+                    )
+                )
+                if selected_bins:
+                    proposals.append(
+                        temporal_lagstack_propose(
+                            residual,
+                            ctx,
+                            bins=np.array(selected_bins, dtype=np.int64),
+                            lags=self.cfg.temporal_lags,
+                            top_k=self.cfg.temporal_k,
+                        )
+                    )
 
             step, rec = fit_stage(
                 residual, proposals, self.cfg.ridge_alpha, self.cfg.nu
