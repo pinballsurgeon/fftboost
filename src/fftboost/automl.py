@@ -56,6 +56,9 @@ class AutoMLConfig:
     stages: tuple[int, ...] = (16, 32, 64)
     k_ffts: tuple[int, ...] = (4, 8, 12)
     min_sep_bins: tuple[int, ...] = (2, 3)
+    # Classification expert search
+    clf_ks: tuple[int, ...] = (2, 4, 6)
+    clf_methods: tuple[Literal["fscore", "mi"], ...] = ("fscore",)
 
 
 class AutoMLController:
@@ -69,24 +72,41 @@ class AutoMLController:
                 for k in self.cfg.k_ffts:
                     for sep in self.cfg.min_sep_bins:
                         if task == "binary":
-                            losses = ["logistic"]
+                            for ck in self.cfg.clf_ks:
+                                for cm in self.cfg.clf_methods:
+                                    out.append(
+                                        BoosterConfig(
+                                            n_stages=st,
+                                            nu=nu,
+                                            ridge_alpha=1e-3,
+                                            early_stopping_rounds=10,
+                                            loss=cast(Any, "logistic"),
+                                            huber_delta=1.0,
+                                            quantile_alpha=0.5,
+                                            k_fft=k,
+                                            min_sep_bins=sep,
+                                            lambda_hf=0.0,
+                                            clf_use=True,
+                                            clf_k=int(ck),
+                                            clf_method=cast(Any, cm),
+                                        )
+                                    )
                         else:
-                            losses = ["huber", "squared"]
-                        for loss in losses:
-                            out.append(
-                                BoosterConfig(
-                                    n_stages=st,
-                                    nu=nu,
-                                    ridge_alpha=1e-3,
-                                    early_stopping_rounds=10,
-                                    loss=cast(Any, loss),
-                                    huber_delta=1.0,
-                                    quantile_alpha=0.5,
-                                    k_fft=k,
-                                    min_sep_bins=sep,
-                                    lambda_hf=0.0,
+                            for loss in ("huber", "squared"):
+                                out.append(
+                                    BoosterConfig(
+                                        n_stages=st,
+                                        nu=nu,
+                                        ridge_alpha=1e-3,
+                                        early_stopping_rounds=10,
+                                        loss=cast(Any, loss),
+                                        huber_delta=1.0,
+                                        quantile_alpha=0.5,
+                                        k_fft=k,
+                                        min_sep_bins=sep,
+                                        lambda_hf=0.0,
+                                    )
                                 )
-                            )
         # Limit to n_configs deterministically
         return out[: self.cfg.n_configs]
 
