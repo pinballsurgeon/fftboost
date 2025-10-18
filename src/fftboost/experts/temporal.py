@@ -39,10 +39,11 @@ def propose_flux(
     d = np.zeros_like(psd)
     d[1:, :] = psd[1:, :] - psd[:-1, :]
 
-    Z, mu, sigma = _standardize_cols(d)
-    rz = (residual - residual.mean()) / (residual.std() + 1e-12)
-    # Correlation-like score per bin
-    scores = np.abs(rz @ Z) / float(n_windows)
+    # Flux-energy score per bin (robust to monotonic trends)
+    scores = np.sqrt(np.mean(d * d, axis=0))
+    # Moments for downstream normalization
+    mu = d.mean(axis=0)
+    sigma = d.std(axis=0)
 
     # Apply penalties and min-sep around selected bins
     if freqs.size > 0 and ctx.lambda_hf > 0.0:
@@ -101,6 +102,66 @@ def propose_lagstack(
                     "freq_hz": float(freqs[int(b)]),
                     "bin": int(b),
                     "lag": int(L),
+                }
+            )
+
+    if not cols:
+        return Proposal(
+            H=np.empty((n_windows, 0)),
+            descriptors=[],
+            mu=np.array([]),
+            sigma=np.array([]),
+        )
+
+    H = np.column_stack(cols)
+    Z, mu, sigma = _standardize_cols(H)
+    rz = (residual - residual.mean()) / (residual.std() + 1e-12)
+    scores = np.abs(rz @ Z) / float(n_windows)
+
+    k = min(top_k, H.shape[1])
+    idxs = np.argpartition(scores, -k)[-k:]
+    idxs = idxs[np.argsort(scores[idxs])[::-1]]
+    return Proposal(
+        H=H[:, idxs],
+        descriptors=[desc[i] for i in idxs],
+        mu=mu[idxs],
+        sigma=sigma[idxs],
+    )
+
+
+def propose_burstpool(
+    residual: np.ndarray[Any, Any],
+    ctx: ExpertContext,
+    *,
+    widths: Iterable[int] = (3, 5),
+    top_k: int = 5,
+) -> Proposal:
+    psd = ctx.psd
+    freqs = ctx.freqs
+    n_windows, n_bins = psd.shape
+    widths = [int(w) for w in widths if int(w) >= 2]
+    if not widths or top_k <= 0:
+        return Proposal(
+            H=np.empty((n_windows, 0)),
+            descriptors=[],
+            mu=np.array([]),
+            sigma=np.array([]),
+        )
+
+    cols: list[np.ndarray[Any, Any]] = []
+    desc: list[dict[str, object]] = []
+    for b in range(n_bins):
+        x = psd[:, b]
+        for w in widths:
+            k = np.ones(w, dtype=np.float64) / float(w)
+            y = np.convolve(x, k, mode="same")
+            cols.append(y)
+            desc.append(
+                {
+                    "type": "pool_bin",
+                    "freq_hz": float(freqs[b]),
+                    "bin": int(b),
+                    "width": int(w),
                 }
             )
 

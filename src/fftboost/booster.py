@@ -13,6 +13,7 @@ from .boosting import fit_stage
 from .experts.clf_bin import propose as clf_bin_propose
 from .experts.fft_bin import propose as fftbin_propose
 from .experts.sk_band import propose as sk_band_propose
+from .experts.temporal import propose_burstpool as temporal_pool_propose
 from .experts.temporal import propose_flux as temporal_flux_propose
 from .experts.temporal import propose_lagstack as temporal_lagstack_propose
 from .experts.types import ExpertContext
@@ -46,6 +47,7 @@ class BoosterConfig:
     temporal_use: bool = False
     temporal_k: int = 4
     temporal_lags: tuple[int, ...] = (1, 2, 3)
+    temporal_pool_widths: tuple[int, ...] = (3, 5)
 
 
 class Booster:
@@ -178,6 +180,14 @@ class Booster:
                             top_k=self.cfg.temporal_k,
                         )
                     )
+                proposals.append(
+                    temporal_pool_propose(
+                        residual,
+                        ctx,
+                        widths=self.cfg.temporal_pool_widths,
+                        top_k=self.cfg.temporal_k,
+                    )
+                )
 
             step, rec = fit_stage(
                 residual, proposals, self.cfg.ridge_alpha, self.cfg.nu
