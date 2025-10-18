@@ -34,3 +34,9 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
+    - name: Run Gauntlet (Phase 1 gates)
+      run: |
+        python benchmarks/gauntlet.py --phase1-gate
+    - name: Run Gauntlet (Phase 2 gates)
+      run: |
+        python benchmarks/gauntlet.py --phase2-gate

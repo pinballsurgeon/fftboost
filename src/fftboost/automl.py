@@ -44,11 +44,17 @@ def _r2_via_corr(y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]) -> 
 
 @dataclass(frozen=True)
 class AutoMLConfig:
-    n_configs: int = 8
+    """Configuration for AutoMLController candidate generation.
+
+    n_configs limits the total candidates evaluated deterministically.
+    Search spaces combine to produce candidates; controller truncates to n_configs.
+    """
+
+    n_configs: int = 12
     # Simple, deterministic search space
     nus: tuple[float, ...] = (0.1, 0.3, 0.5, 0.7)
     stages: tuple[int, ...] = (16, 32, 64)
-    k_ffts: tuple[int, ...] = (4, 8)
+    k_ffts: tuple[int, ...] = (4, 8, 12)
     min_sep_bins: tuple[int, ...] = (2, 3)
 
 

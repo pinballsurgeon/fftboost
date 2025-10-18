@@ -108,7 +108,7 @@ def task_class_whale_song(rng: np.random.Generator) -> tuple[str, float, bool]:
 
 
 def task_class_morse_code(rng: np.random.Generator) -> tuple[str, float, bool]:
-    # Expected to struggle until temporal experts exist; report only.
+    # With classification-aware expert, this should now pass robustly.
     fs = 2000
     duration_s = 20.0
     t = np.arange(int(fs * duration_s)) / fs
@@ -172,7 +172,7 @@ def run_phase1(strict_gate: bool) -> int:
     print("\nGauntlet (Phase 1)")
     print("-----------------")
     for r in results:
-        status = "PASS" if r.passed else "INFO" if "morse" in r.name else "FAIL"
+        status = "PASS" if r.passed else "FAIL"
         print(f"{r.name:28s}  {r.metric:8.4f}  {status}")
 
     if strict_gate:
@@ -196,7 +196,7 @@ def run_phase2(strict_gate: bool) -> int:
     print("-----------------")
     all_ok = True
     for name, metric, passed in tasks:
-        status = "PASS" if passed else ("INFO" if "morse" in name else "FAIL")
+        status = "PASS" if passed else "FAIL"
         print(f"{name:28s}  {metric:8.4f}  {status}")
         if strict_gate and status == "FAIL":
             all_ok = False

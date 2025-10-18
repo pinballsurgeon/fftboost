@@ -10,6 +10,7 @@ import numpy as np
 
 from .boosting import StageRecord
 from .boosting import fit_stage
+from .experts.clf_bin import propose as clf_bin_propose
 from .experts.fft_bin import propose as fftbin_propose
 from .experts.sk_band import propose as sk_band_propose
 from .experts.types import ExpertContext
@@ -35,6 +36,10 @@ class BoosterConfig:
     default_band_edges_hz: list[tuple[float, float]] | None = None
     sk_n_select: int = 1
     sk_kurtosis_boost: float = 0.0
+    # Classification-aware expert
+    clf_use: bool = True
+    clf_k: int = 4
+    clf_method: Literal["fscore", "mi"] = "fscore"
 
 
 class Booster:
@@ -124,6 +129,9 @@ class Booster:
                 if selected_bins
                 else None,
                 band_edges_hz=band_edges_arr,
+                y_labels=(y_tr > 0.5).astype(np.int64)
+                if self.cfg.loss == "logistic"
+                else None,
             )
             proposals = [fftbin_propose(residual, ctx, top_k=self.cfg.k_fft)]
             if band_edges_arr is not None:
@@ -133,6 +141,16 @@ class Booster:
                         ctx,
                         n_select=self.cfg.sk_n_select,
                         kurtosis_boost=self.cfg.sk_kurtosis_boost,
+                    )
+                )
+            # Add classification-aware proposals when applicable
+            if self.cfg.loss == "logistic" and self.cfg.clf_use:
+                proposals.append(
+                    clf_bin_propose(
+                        residual,
+                        ctx,
+                        top_k=self.cfg.clf_k,
+                        method=self.cfg.clf_method,
                     )
                 )
 
