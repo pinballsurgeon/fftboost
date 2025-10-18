@@ -43,7 +43,7 @@ class BoosterConfig:
     clf_k: int = 4
     clf_method: Literal["fscore", "mi"] = "fscore"
     # Temporal experts
-    temporal_use: bool = True
+    temporal_use: bool = False
     temporal_k: int = 4
     temporal_lags: tuple[int, ...] = (1, 2, 3)
 
