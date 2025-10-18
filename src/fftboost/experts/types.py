@@ -15,6 +15,9 @@ class ExpertContext:
     lambda_hf: float
     selected_bins: np.ndarray[Any, Any] | None = None  # shape: (k,), int64 or None
     band_edges_hz: np.ndarray[Any, Any] | None = None  # optional band edges for sk_band
+    y_labels: np.ndarray[Any, Any] | None = (
+        None  # optional binary labels for classification
+    )
 
 
 @dataclass(frozen=True)

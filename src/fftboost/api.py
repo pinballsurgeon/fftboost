@@ -21,6 +21,7 @@ class FFTBoost:
         self._booster: Booster | None = None
         self.is_fitted: bool = False
         self._y_offset: float | None = None
+        self.automl_info: dict[str, Any] | None = None
 
     def fit(
         self,
@@ -97,7 +98,19 @@ class FFTBoost:
     def save(self, path_prefix: str) -> dict[str, str]:
         if not self.is_fitted or self._booster is None:
             raise RuntimeError("Model not fitted")
-        return save_model(self._booster.artifact, path_prefix)
+        # Augment artifact config with AutoML info if present
+        artifact = self._booster.artifact
+        cfg: dict[str, Any] = {"cfg": self.config.__dict__}
+        if self.automl_info is not None:
+            cfg["automl"] = self.automl_info
+        enriched = BoosterArtifact(
+            schema_version=artifact.schema_version,
+            fftboost_version=artifact.fftboost_version,
+            freqs=artifact.freqs,
+            stages=artifact.stages,
+            config=cfg,
+        )
+        return save_model(enriched, path_prefix)
 
     @classmethod
     def load(cls, path_prefix: str) -> FFTBoost:
@@ -110,6 +123,16 @@ class FFTBoost:
         model._booster = booster
         model.is_fitted = True
         model._y_offset = None
+        # Restore automl info if present
+        if artifact.config and "automl" in artifact.config:
+            try:
+                val = artifact.config.get("automl")
+                if isinstance(val, dict):
+                    model.automl_info = dict(val)
+                else:
+                    model.automl_info = None
+            except Exception:
+                model.automl_info = None
         return model
 
     def get_feature_importances(self, kind: str = "all") -> list[dict[str, object]]:
@@ -165,6 +188,50 @@ class FFTBoost:
             else:
                 out.append({"type": "sk_band", "band_hz": key[1], "score": sc})
         return out
+
+    @classmethod
+    def auto(
+        cls,
+        signal: np.ndarray[Any, Any],
+        y: np.ndarray[Any, Any],
+        *,
+        fs: float,
+        window_s: float,
+        hop_s: float,
+        val_size: float = 0.2,
+        val_gap_windows: int = 1,
+        center_target: bool = True,
+        n_configs: int | None = None,
+        budget_stages: int | None = 64,
+        halving_rounds: int = 2,
+    ) -> tuple[object, dict[str, Any]]:
+        """
+        One-call AutoML that returns a fitted model and info.
+        Works for regression and binary classification.
+        Thin wrapper around AutoMLController.fit_best.
+        """
+        # Lazy import to avoid circular import at module load time
+        from .automl import AutoMLConfig
+        from .automl import AutoMLController
+
+        cfg = AutoMLConfig(n_configs=n_configs or AutoMLConfig().n_configs)
+        ctl = AutoMLController(cfg)
+        model, info = ctl.fit_best(
+            signal,
+            y,
+            fs=fs,
+            window_s=window_s,
+            hop_s=hop_s,
+            val_size=val_size,
+            val_gap_windows=val_gap_windows,
+            center_target=center_target,
+            budget_stages=budget_stages,
+            halving_rounds=halving_rounds,
+        )
+        # Attach automl_info for FFTBoost instances
+        if isinstance(model, FFTBoost):
+            model.automl_info = info
+        return model, info
 
 
 class FFTBoostClassifier:
