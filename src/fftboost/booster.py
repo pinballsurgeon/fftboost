@@ -15,6 +15,7 @@ from .experts.sk_band import propose as sk_band_propose
 from .experts.types import ExpertContext
 from .io import BoosterArtifact
 from .losses import HuberLoss
+from .losses import LogisticLoss
 from .losses import QuantileLoss
 from .losses import SquaredLoss
 
@@ -25,7 +26,7 @@ class BoosterConfig:
     nu: float = 0.1
     ridge_alpha: float = 1e-3
     early_stopping_rounds: int = 10
-    loss: Literal["squared", "huber", "quantile"] = "huber"
+    loss: Literal["squared", "huber", "quantile", "logistic"] = "huber"
     huber_delta: float = 1.0
     quantile_alpha: float = 0.5
     k_fft: int = 4
@@ -90,6 +91,8 @@ class Booster:
             loss_fn = HuberLoss(delta=self.cfg.huber_delta)
         elif self.cfg.loss == "quantile":
             loss_fn = QuantileLoss(alpha=self.cfg.quantile_alpha)
+        elif self.cfg.loss == "logistic":
+            loss_fn = LogisticLoss()
         else:
             loss_fn = SquaredLoss()
 

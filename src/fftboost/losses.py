@@ -113,3 +113,37 @@ class QuantileLoss:
         # Deterministic subgradient at r == 0 via y_true comparison
         grad = -np.where(y_true > y_pred, self.alpha, self.alpha - 1.0)
         return cast(np.ndarray[Any, Any], (grad / n).astype(np.float64, copy=False))
+
+
+@final
+class LogisticLoss:
+    """
+    Binary cross-entropy on logits.
+
+    Uses model output as logit z, with probability p = sigmoid(z).
+    Targets y in {0, 1}.
+
+    Loss: mean( softplus(z) - y * z ) where softplus(z) = log(1 + exp(z)).
+    Gradient wrt z: sigmoid(z) - y, averaged over samples.
+    """
+
+    @staticmethod
+    def _sigmoid(z: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
+        return cast(np.ndarray[Any, Any], 1.0 / (1.0 + np.exp(-z)))
+
+    def __call__(
+        self, y_true: np.ndarray[Any, Any], y_logit: np.ndarray[Any, Any]
+    ) -> float:
+        z = y_logit
+        # stable softplus
+        sp = np.maximum(z, 0) + np.log1p(np.exp(-np.abs(z)))
+        loss = sp - y_true * z
+        return float(np.mean(loss))
+
+    def gradient(
+        self, y_true: np.ndarray[Any, Any], y_logit: np.ndarray[Any, Any]
+    ) -> np.ndarray[Any, Any]:
+        p = self._sigmoid(y_logit)
+        grad = p - y_true
+        n = float(y_true.shape[0])
+        return cast(np.ndarray[Any, Any], (grad / n).astype(np.float64, copy=False))
