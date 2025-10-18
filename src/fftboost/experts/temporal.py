@@ -39,9 +39,13 @@ def propose_flux(
     d = np.zeros_like(psd)
     d[1:, :] = psd[1:, :] - psd[:-1, :]
 
-    # Flux-energy score per bin (robust to monotonic trends)
-    scores = np.sqrt(np.mean(d * d, axis=0))
-    # Moments for downstream normalization
+    # Score bins by correlation of original per-bin series with residual
+    # (better at picking monotonic ramps than pure flux energy),
+    # but return flux (d) as the proposed features for temporal sensitivity.
+    Zp, _, _ = _standardize_cols(psd)
+    rz = (residual - residual.mean()) / (residual.std() + 1e-12)
+    scores = np.abs(rz @ Zp) / float(n_windows)
+    # Moments for downstream normalization (on flux features we return)
     mu = d.mean(axis=0)
     sigma = d.std(axis=0)
 
