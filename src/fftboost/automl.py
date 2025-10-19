@@ -42,6 +42,21 @@ def _r2_via_corr(y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]) -> 
     return float(c * c)
 
 
+def _explained_variance(
+    y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
+) -> float:
+    m = min(y_true.shape[0], y_pred.shape[0])
+    if m <= 1:
+        return 0.0
+    yt = y_true[:m]
+    yp = y_pred[:m]
+    var_y = float(np.var(yt))
+    if var_y <= 1e-12:
+        return 0.0
+    var_e = float(np.var(yt - yp))
+    return float(max(0.0, 1.0 - (var_e / var_y)))
+
+
 @dataclass(frozen=True)
 class AutoMLConfig:
     """Configuration for AutoMLController candidate generation.
@@ -112,7 +127,27 @@ class AutoMLController:
                                                 )
                                             )
                         else:
+                            # Regression: prioritize FFT-only baselines first,
+                            # then a smaller set of temporal-enabled candidates.
+                            # Apply a mild HF penalty by default.
                             for loss in ("huber", "squared"):
+                                # Baseline (temporal disabled)
+                                out.append(
+                                    BoosterConfig(
+                                        n_stages=st,
+                                        nu=nu,
+                                        ridge_alpha=1e-3,
+                                        early_stopping_rounds=10,
+                                        loss=cast(Any, loss),
+                                        huber_delta=1.0,
+                                        quantile_alpha=0.5,
+                                        k_fft=k,
+                                        min_sep_bins=sep,
+                                        lambda_hf=0.05,
+                                        temporal_use=False,
+                                    )
+                                )
+                                # A small temporal set (kept but secondary in ordering)
                                 for tk in self.cfg.temporal_ks:
                                     for lset in self.cfg.temporal_lag_sets:
                                         out.append(
@@ -126,7 +161,7 @@ class AutoMLController:
                                                 quantile_alpha=0.5,
                                                 k_fft=k,
                                                 min_sep_bins=sep,
-                                                lambda_hf=0.0,
+                                                lambda_hf=0.05,
                                                 temporal_use=True,
                                                 temporal_k=int(tk),
                                                 temporal_lags=tuple(
@@ -171,9 +206,14 @@ class AutoMLController:
             # Single full fit per candidate
             budgets = [0]
         else:
-            # Smallest -> largest
+            # Smallest -> largest; prefer a slightly higher starting budget
+            # to reduce myopia in early rounds
             base = max(1, budget_stages // (2**halving_rounds))
-            budgets = [base * (2**r) for r in range(halving_rounds + 1)]
+            if base < 24 and budget_stages >= 24:
+                base = 24
+            budgets = [
+                min(budget_stages, base * (2**r)) for r in range(halving_rounds + 1)
+            ]
 
         survivors = cand_cfgs
         scoreboard: list[tuple[BoosterConfig, float]] = []
@@ -202,7 +242,10 @@ class AutoMLController:
                     )
                     y_val = y[: pred.shape[0]][val_sl]
                     p_val = pred[val_sl]
-                    score = _r2_via_corr(y_val, p_val)
+                    # Blend correlation-R^2 with explained variance for stability
+                    score = 0.5 * _r2_via_corr(
+                        y_val, p_val
+                    ) + 0.5 * _explained_variance(y_val, p_val)
                 else:
                     labels = (y > 0.5).astype(np.float64)
                     clf = FFTBoostClassifier(cfg_eff, threshold="auto")
@@ -233,11 +276,23 @@ class AutoMLController:
                 if ridx == len(budgets) - 1:
                     scoreboard.append((cfg, score))
 
-            # Select survivors for next round (top 50%)
+            # Select survivors for next round (top ~33%) and always carry
+            # the best FFT-only baseline (if present)
             if ridx < len(budgets) - 1:
                 round_scores.sort(key=lambda t: t[1], reverse=True)
-                keep = max(1, len(round_scores) // 2)
-                survivors = [t[0] for t in round_scores[:keep]]
+                keep = max(2, max(1, (len(round_scores) + 2) // 3))
+                next_survivors = [t[0] for t in round_scores[:keep]]
+                # Ensure a baseline (temporal_use=False) survives if present
+                baseline = None
+                for cfg, sc, _ in round_scores:
+                    if cfg.temporal_use is False:
+                        baseline = cfg if baseline is None else baseline
+                        break
+                if baseline is not None and all(
+                    s is not baseline for s in next_survivors
+                ):
+                    next_survivors.append(baseline)
+                survivors = next_survivors
                 # Track current best so far
                 if round_scores[0][1] > best_score:
                     best_score = round_scores[0][1]
