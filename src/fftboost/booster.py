@@ -184,8 +184,8 @@ class Booster:
                         method=self.cfg.clf_method,
                     )
                 )
-            # Temporal experts (operate on window dynamics)
-            if self.cfg.temporal_use:
+            # Temporal experts (operate on window dynamics) — enable after first stage
+            if self.cfg.temporal_use and m >= 1:
                 proposals.append(
                     temporal_flux_propose(
                         residual,

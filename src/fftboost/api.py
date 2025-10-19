@@ -353,12 +353,23 @@ class FFTBoostClassifier:
             ys = y_bin[:total]
             s_val = scores[val_idx]
             y_val = ys[val_idx]
-            pos = s_val[y_val > 0.5]
-            neg = s_val[y_val <= 0.5]
-            if pos.size == 0 or neg.size == 0:
+            # Grid-search threshold on validation to maximize accuracy
+            # Use percentiles of scores to keep it fast and robust
+            if s_val.size == 0:
                 thr = 0.0
             else:
-                thr = 0.5 * (float(pos.mean()) + float(neg.mean()))
+                grid = np.unique(
+                    np.percentile(s_val, [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95])
+                )
+                best_thr = 0.0
+                best_acc = -1.0
+                for t in grid:
+                    preds = (s_val >= float(t)).astype(np.int64)
+                    acc = float((preds == (y_val > 0.5)).mean())
+                    if acc > best_acc:
+                        best_acc = acc
+                        best_thr = float(t)
+                thr = best_thr
         self.threshold_ = thr
         return self
 
