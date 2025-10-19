@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip build twine
+
+      - name: Verify tag matches version
+        run: |
+          python - << 'PY'
+          import os, re, sys
+          from pathlib import Path
+          tag = os.environ.get('GITHUB_REF_NAME', '')
+          if not tag.startswith('v'):
+            print(f"Tag must start with 'v', got: {tag}")
+            sys.exit(1)
+          tag_ver = tag[1:]
+          # __init__ version
+          init = Path('src/fftboost/__init__.py').read_text(encoding='utf-8')
+          m = re.search(r"__version__\s*=\s*\"([^\"]+)\"", init)
+          if not m:
+            print("Could not find __version__ in src/fftboost/__init__.py")
+            sys.exit(1)
+          init_ver = m.group(1)
+          # pyproject version
+          py = Path('pyproject.toml').read_text(encoding='utf-8')
+          m2 = re.search(r"^version\s*=\s*\"([^\"]+)\"", py, re.M)
+          if not m2:
+            print("Could not find version in pyproject.toml")
+            sys.exit(1)
+          proj_ver = m2.group(1)
+          ok = (tag_ver == init_ver == proj_ver)
+          print(f"Tag: {tag_ver}, __init__: {init_ver}, pyproject: {proj_ver}")
+          if not ok:
+            print("Version mismatch: tag, __init__, and pyproject must match")
+            sys.exit(1)
+          PY
+
+      - name: Build sdist and wheel
+        run: |
+          python -m build
+          python -m twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          # Set to true if you want to allow re-upload of same files
+          # skip-existing: true
