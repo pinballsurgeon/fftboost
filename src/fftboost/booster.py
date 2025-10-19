@@ -17,6 +17,7 @@ from .experts.temporal import propose_burstpool as temporal_pool_propose
 from .experts.temporal import propose_flux as temporal_flux_propose
 from .experts.temporal import propose_lagstack as temporal_lagstack_propose
 from .experts.types import ExpertContext
+from .experts.types import Proposal
 from .io import BoosterArtifact
 from .losses import HuberLoss
 from .losses import LogisticLoss
@@ -125,6 +126,14 @@ class Booster:
             else:
                 band_edges_arr = edges
 
+        # Optional: dominant-bin seed for regression to bias first stage
+        seed_bin: int | None = None
+        if self.cfg.loss != "logistic":
+            Zp = (psd_tr - psd_tr.mean(axis=0)) / (psd_tr.std(axis=0) + 1e-12)
+            rz = (y_tr - y_tr.mean()) / (y_tr.std() + 1e-12)
+            scores = np.abs(rz @ Zp) / float(psd_tr.shape[0])
+            seed_bin = int(np.argmax(scores)) if scores.size > 0 else None
+
         for m in range(self.cfg.n_stages):
             residual = -loss_fn.gradient(y_tr, y_pred_tr)
             ctx = ExpertContext(
@@ -142,6 +151,20 @@ class Booster:
                 else None,
             )
             proposals = [fftbin_propose(residual, ctx, top_k=self.cfg.k_fft)]
+            if m == 0 and seed_bin is not None and 0 <= int(seed_bin) < freqs.size:
+                b = int(seed_bin)
+                H_seed = psd_tr[:, [b]]
+                mu_seed = psd_tr.mean(axis=0)[[b]]
+                sigma_seed = psd_tr.std(axis=0)[[b]]
+                desc_seed = [
+                    {"type": "fft_bin", "freq_hz": float(freqs[b]), "bin": int(b)}
+                ]
+                proposals.insert(
+                    0,
+                    Proposal(
+                        H=H_seed, descriptors=desc_seed, mu=mu_seed, sigma=sigma_seed
+                    ),
+                )
             if band_edges_arr is not None:
                 proposals.append(
                     sk_band_propose(
