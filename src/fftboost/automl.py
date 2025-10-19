@@ -102,6 +102,25 @@ class AutoMLController:
                                 methods = ("fscore",)
                             for ck in self.cfg.clf_ks:
                                 for cm in methods:
+                                    # Baseline (temporal disabled) for binary too
+                                    out.append(
+                                        BoosterConfig(
+                                            n_stages=st,
+                                            nu=nu,
+                                            ridge_alpha=1e-3,
+                                            early_stopping_rounds=10,
+                                            loss=cast(Any, "logistic"),
+                                            huber_delta=1.0,
+                                            quantile_alpha=0.5,
+                                            k_fft=k,
+                                            min_sep_bins=sep,
+                                            lambda_hf=0.1,
+                                            clf_use=True,
+                                            clf_k=int(ck),
+                                            clf_method=cast(Any, cm),
+                                            temporal_use=False,
+                                        )
+                                    )
                                     for tk in self.cfg.temporal_ks:
                                         for lset in self.cfg.temporal_lag_sets:
                                             out.append(
@@ -115,7 +134,7 @@ class AutoMLController:
                                                     quantile_alpha=0.5,
                                                     k_fft=k,
                                                     min_sep_bins=sep,
-                                                    lambda_hf=0.0,
+                                                    lambda_hf=0.1,
                                                     clf_use=True,
                                                     clf_k=int(ck),
                                                     clf_method=cast(Any, cm),
@@ -143,7 +162,7 @@ class AutoMLController:
                                         quantile_alpha=0.5,
                                         k_fft=k,
                                         min_sep_bins=sep,
-                                        lambda_hf=0.05,
+                                        lambda_hf=0.1,
                                         temporal_use=False,
                                     )
                                 )
@@ -161,7 +180,7 @@ class AutoMLController:
                                                 quantile_alpha=0.5,
                                                 k_fft=k,
                                                 min_sep_bins=sep,
-                                                lambda_hf=0.05,
+                                                lambda_hf=0.1,
                                                 temporal_use=True,
                                                 temporal_k=int(tk),
                                                 temporal_lags=tuple(
@@ -243,9 +262,9 @@ class AutoMLController:
                     y_val = y[: pred.shape[0]][val_sl]
                     p_val = pred[val_sl]
                     # Blend correlation-R^2 with explained variance for stability
-                    score = 0.5 * _r2_via_corr(
+                    score = 0.3 * _r2_via_corr(
                         y_val, p_val
-                    ) + 0.5 * _explained_variance(y_val, p_val)
+                    ) + 0.7 * _explained_variance(y_val, p_val)
                 else:
                     labels = (y > 0.5).astype(np.float64)
                     clf = FFTBoostClassifier(cfg_eff, threshold="auto")
