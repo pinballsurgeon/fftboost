@@ -21,6 +21,7 @@ dependencies = [
 
 [project.scripts]
 fftboost-automl = "fftboost.cli:main"
+fftboost-ensure = "scripts.ensure_fftboost:main"
 
 [project.optional-dependencies]
 dev = [
