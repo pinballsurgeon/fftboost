@@ -139,18 +139,40 @@ class FFTBoost:
         """
         Aggregate simple per-feature contribution scores from fitted stages.
 
-        Scoring heuristic: sum over stages of (nu * |gamma| * |w_j|) per descriptor.
-        This provides an interpretable, stage-accumulated magnitude for each
-        selected feature (fft_bin or sk_band).
+        Scoring heuristic: sum over stages of (nu * |gamma| * |w_j|)
+        per descriptor. This provides an interpretable, stage-accumulated
+        magnitude for each selected feature.
 
-        kind: 'fft_bin' | 'sk_band' | 'all'
+        Supported types: fft_bin, sk_band, clf_bin, flux_bin, lag_bin,
+        pool_bin.
+
+        kind: 'fft_bin' | 'sk_band' | 'clf_bin' | 'flux_bin'
+              | 'lag_bin' | 'pool_bin' | 'all'
         """
         if not self.is_fitted or self._booster is None:
             raise RuntimeError("Model not fitted")
-        if kind not in ("fft_bin", "sk_band", "all"):
-            raise ValueError("kind must be 'fft_bin', 'sk_band', or 'all'")
+        valid_kinds = {
+            "fft_bin",
+            "sk_band",
+            "clf_bin",
+            "flux_bin",
+            "lag_bin",
+            "pool_bin",
+            "all",
+        }
+        if kind not in valid_kinds:
+            raise ValueError("kind must be one of: " + ", ".join(sorted(valid_kinds)))
 
-        Key = tuple[str, Union[float, tuple[float, float]]]
+        Key = tuple[
+            str,
+            Union[
+                float,
+                tuple[float, float],
+                tuple[float, int],
+                tuple[float, int],
+                tuple[float, int],
+            ],
+        ]
         scores: dict[Key, float] = {}
         for rec in self._booster.stages:
             if rec.weights.size == 0:
@@ -158,14 +180,12 @@ class FFTBoost:
             # Descriptor list aligns with weights order in StageRecord
             for d, w in zip(rec.descriptors, rec.weights):
                 d_type = d.get("type")
-                if d_type not in ("fft_bin", "sk_band"):
-                    continue
                 if kind != "all" and d_type != kind:
                     continue
                 if d_type == "fft_bin":
                     fval = float(cast(Any, d.get("freq_hz", 0.0)))
                     key: Key = ("fft_bin", fval)
-                else:
+                elif d_type == "sk_band":
                     band_obj = d.get("band_hz", (0.0, 0.0))
                     if isinstance(band_obj, tuple) and len(band_obj) == 2:
                         lo_raw = band_obj[0]
@@ -177,16 +197,56 @@ class FFTBoost:
                     else:
                         band_t = (0.0, 0.0)
                     key = ("sk_band", band_t)
+                elif d_type == "clf_bin":
+                    fval = float(cast(Any, d.get("freq_hz", 0.0)))
+                    key = ("clf_bin", fval)
+                elif d_type == "flux_bin":
+                    fval = float(cast(Any, d.get("freq_hz", 0.0)))
+                    # flux keyed by freq only
+                    key = ("flux_bin", fval)
+                elif d_type == "lag_bin":
+                    fval = float(cast(Any, d.get("freq_hz", 0.0)))
+                    lag = int(cast(Any, d.get("lag", 1)))
+                    key = ("lag_bin", (fval, lag))
+                elif d_type == "pool_bin":
+                    fval = float(cast(Any, d.get("freq_hz", 0.0)))
+                    width = int(cast(Any, d.get("width", 3)))
+                    key = ("pool_bin", (fval, width))
+                else:
+                    # Unknown descriptor type; skip for importances
+                    continue
                 contrib = float(rec.nu) * abs(float(rec.gamma)) * abs(float(w))
                 scores[key] = scores.get(key, 0.0) + contrib
 
         # Format as list of descriptors with score
         out: list[dict[str, object]] = []
         for key, sc in sorted(scores.items(), key=lambda kv: kv[1], reverse=True):
-            if key[0] == "fft_bin":
-                out.append({"type": "fft_bin", "freq_hz": key[1], "score": sc})
-            else:
-                out.append({"type": "sk_band", "band_hz": key[1], "score": sc})
+            ktype = key[0]
+            kval = key[1]
+            if ktype in ("fft_bin", "clf_bin", "flux_bin"):
+                out.append({"type": ktype, "freq_hz": kval, "score": sc})
+            elif ktype == "sk_band":
+                out.append({"type": "sk_band", "band_hz": kval, "score": sc})
+            elif ktype == "lag_bin":
+                f, lag = cast(Any, kval)
+                out.append(
+                    {
+                        "type": "lag_bin",
+                        "freq_hz": float(f),
+                        "lag": int(lag),
+                        "score": sc,
+                    }
+                )
+            elif ktype == "pool_bin":
+                f, width = cast(Any, kval)
+                out.append(
+                    {
+                        "type": "pool_bin",
+                        "freq_hz": float(f),
+                        "width": int(width),
+                        "score": sc,
+                    }
+                )
         return out
 
     @classmethod

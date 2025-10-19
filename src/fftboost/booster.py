@@ -314,7 +314,15 @@ class Booster:
                         idx = nearest_index(freqs, f)
                         series = psd[:, idx]
                     k = np.ones(width, dtype=np.float64) / float(width)
-                    cols.append(np.convolve(series, k, mode="same"))
+                    y = np.convolve(series, k, mode="same")
+                    # numpy.convolve(mode="same") returns length max(len(series), width)
+                    # When width > len(series) (e.g., short validation block),
+                    # center-crop to preserve the window dimension.
+                    if y.shape[0] != series.shape[0]:
+                        extra = y.shape[0] - series.shape[0]
+                        start = max(0, extra // 2)
+                        y = y[start : start + series.shape[0]]
+                    cols.append(y)
             H = np.column_stack(cols) if cols else np.zeros((psd.shape[0], 0))
             if H.shape[1] == 0:
                 continue
