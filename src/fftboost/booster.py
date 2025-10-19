@@ -251,6 +251,11 @@ class Booster:
                 return int(fgrid.size - 1)
             return int(i - 1 if abs(f - fgrid[i - 1]) <= abs(fgrid[i] - f) else i)
 
+        # Precompute temporal differences for flux features
+        d_psd = np.zeros_like(psd)
+        if psd.shape[0] >= 2:
+            d_psd[1:, :] = psd[1:, :] - psd[:-1, :]
+
         for record in records:
             # Reconstruct H from descriptors without searching
             cols: list[np.ndarray[Any, Any]] = []
@@ -271,6 +276,45 @@ class Booster:
                         if mask.any()
                         else np.zeros(psd.shape[0])
                     )
+                elif d.get("type") == "clf_bin":
+                    # Classification bin behaves like fft_bin
+                    if same_grid:
+                        cols.append(psd[:, int(cast(int, d["bin"]))])
+                    else:
+                        f = float(cast(float, d["freq_hz"]))
+                        idx = nearest_index(freqs, f)
+                        cols.append(psd[:, idx])
+                elif d.get("type") == "flux_bin":
+                    # Temporal flux at bin
+                    if same_grid:
+                        cols.append(d_psd[:, int(cast(int, d["bin"]))])
+                    else:
+                        f = float(cast(float, d["freq_hz"]))
+                        idx = nearest_index(freqs, f)
+                        cols.append(d_psd[:, idx])
+                elif d.get("type") == "lag_bin":
+                    lag = int(cast(int, d.get("lag", 1)))
+                    if same_grid:
+                        series = psd[:, int(cast(int, d["bin"]))]
+                    else:
+                        f = float(cast(float, d["freq_hz"]))
+                        idx = nearest_index(freqs, f)
+                        series = psd[:, idx]
+                    v = np.zeros_like(series)
+                    if lag > 0:
+                        v[lag:] = series[:-lag]
+                    cols.append(v)
+                elif d.get("type") == "pool_bin":
+                    width = int(cast(int, d.get("width", 3)))
+                    width = max(2, width)
+                    if same_grid:
+                        series = psd[:, int(cast(int, d["bin"]))]
+                    else:
+                        f = float(cast(float, d["freq_hz"]))
+                        idx = nearest_index(freqs, f)
+                        series = psd[:, idx]
+                    k = np.ones(width, dtype=np.float64) / float(width)
+                    cols.append(np.convolve(series, k, mode="same"))
             H = np.column_stack(cols) if cols else np.zeros((psd.shape[0], 0))
             if H.shape[1] == 0:
                 continue
