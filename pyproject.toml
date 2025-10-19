@@ -19,6 +19,9 @@ dependencies = [
     "pywavelets"
 ]
 
+[project.scripts]
+fftboost-automl = "fftboost.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest",
