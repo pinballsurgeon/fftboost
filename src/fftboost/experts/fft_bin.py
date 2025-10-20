@@ -18,16 +18,17 @@ def propose(
     freqs = ctx.freqs  # (n_bins,)
     n_windows, n_bins = psd.shape
 
-    # 1. Z-score inputs for correlation calculation
+    # 1. Center inputs for correlation calculation
+    # Do not scale PSD columns, as this would obscure magnitude info.
     res_mu = residual.mean()
     res_std = residual.std()
     psd_mu = psd.mean(axis=0)
-    psd_std = psd.std(axis=0)
+    psd_std = psd.std(axis=0)  # Retain for proposal sigma
     res_z = (residual - res_mu) / (res_std + 1e-12)
-    psd_z = (psd - psd_mu) / (psd_std + 1e-12)
+    psd_centered = psd - psd_mu
 
     # 2. Compute correlation scores (absolute mean dot-product)
-    corrs = np.abs(res_z @ psd_z) / float(n_windows)
+    corrs = np.abs(res_z @ psd_centered) / float(n_windows)
 
     # 3. Apply physics-aware penalties to scores
     scores = corrs.copy()
