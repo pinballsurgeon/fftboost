@@ -53,8 +53,7 @@ def propose(
             sigma=np.empty(0, dtype=np.float64),
         )
 
-    top_indices = np.argpartition(scores, -k)[-k:]
-    top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
+    top_indices = np.argsort(scores)[-k:][::-1]
 
     # 5. Construct the proposal
     H = psd[:, top_indices]
