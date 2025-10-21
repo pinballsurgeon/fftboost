@@ -30,7 +30,9 @@ class SquaredLoss:
         self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
     ) -> np.ndarray[Any, Any]:
         r = y_pred - y_true
-        return cast(np.ndarray[Any, Any], r.astype(np.float64, copy=False))
+        return cast(np.ndarray[Any, Any], r.astype(np.float64, copy=False)) / len(
+            y_true
+        )
 
 
 @final
@@ -71,7 +73,9 @@ class HuberLoss:
         r = y_pred - y_true
         abs_r = np.abs(r)
         grad = np.where(abs_r <= self.delta, r, self.delta * np.sign(r))
-        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False))
+        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False)) / len(
+            y_true
+        )
 
 
 @final
@@ -109,7 +113,9 @@ class QuantileLoss:
     ) -> np.ndarray[Any, Any]:
         # Deterministic subgradient at r == 0 via y_true comparison
         grad = -np.where(y_true > y_pred, self.alpha, self.alpha - 1.0)
-        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False))
+        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False)) / len(
+            y_true
+        )
 
 
 @final
@@ -142,4 +148,6 @@ class LogisticLoss:
     ) -> np.ndarray[Any, Any]:
         p = self._sigmoid(y_logit)
         grad = p - y_true
-        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False))
+        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False)) / len(
+            y_true
+        )
