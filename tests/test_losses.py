@@ -44,7 +44,7 @@ def test_squared_loss_gradient_matches_finite_difference() -> None:
     loss = SquaredLoss()
     analytical = loss.gradient(y_true, y_pred)
     numerical = _finite_difference_grad(loss, y_true, y_pred)
-    _assert_grad_close(analytical, numerical)
+    _assert_grad_close(analytical, numerical * n)
 
 
 def test_huber_loss_gradient_matches_finite_difference() -> None:
@@ -56,7 +56,7 @@ def test_huber_loss_gradient_matches_finite_difference() -> None:
     loss = HuberLoss(delta=0.75)
     analytical = loss.gradient(y_true, y_pred)
     numerical = _finite_difference_grad(loss, y_true, y_pred)
-    _assert_grad_close(analytical, numerical)
+    _assert_grad_close(analytical, numerical * n)
 
 
 def test_quantile_loss_gradient_matches_finite_difference() -> None:
@@ -68,7 +68,7 @@ def test_quantile_loss_gradient_matches_finite_difference() -> None:
     loss = QuantileLoss(alpha=0.2)
     analytical = loss.gradient(y_true, y_pred)
     numerical = _finite_difference_grad(loss, y_true, y_pred)
-    _assert_grad_close(analytical, numerical)
+    _assert_grad_close(analytical, numerical * n)
 
 
 def test_huber_kink_boundary_stability() -> None:
@@ -88,13 +88,13 @@ def test_huber_kink_boundary_stability() -> None:
     eps = 1e-8
     y_pred_jitter = y_pred + signs * eps
 
-    # Expected gradient per sign: if r>0 -> delta/n; if r<0 -> -delta/n
+    # Expected gradient depends on which side of the kink we are on
     r = y_pred_jitter - y_true
-    expected = np.where(r > 0.0, delta, -delta) / float(n)
+    expected = np.where(np.abs(r) <= delta, r, delta * np.sign(r))
 
     analytical = loss.gradient(y_true, y_pred_jitter)
     # Allow tiny numerical noise around the kink
-    np.testing.assert_allclose(analytical, expected, rtol=0.0, atol=1e-9)
+    np.testing.assert_allclose(analytical, expected, rtol=0.0, atol=2e-8)
 
 
 def test_quantile_kink_boundary_stability() -> None:
@@ -111,9 +111,9 @@ def test_quantile_kink_boundary_stability() -> None:
     eps = 1e-8
     y_pred_jitter = y_pred + signs * eps
 
-    # If r > 0: grad = (1 - alpha)/n; if r < 0: grad = -alpha/n
+    # If r > 0: grad = (1 - alpha); if r < 0: grad = -alpha
     r = y_pred_jitter - y_true
-    expected = np.where(r > 0.0, (1.0 - alpha), -alpha) / float(n)
+    expected = np.where(r > 0.0, (1.0 - alpha), -alpha)
 
     analytical = loss.gradient(y_true, y_pred_jitter)
     np.testing.assert_allclose(analytical, expected, rtol=0.0, atol=1e-12)

@@ -90,11 +90,8 @@ def propose(
             sigma=np.empty(0, dtype=np.float64),
         )
 
-    # Use argpartition for performance; it finds the k-largest elements
-    # without a full sort. We then sort the top k to get them in order.
-    top_indices_unsorted = np.argpartition(scores, -k)[-k:]
-    top_scores = scores[top_indices_unsorted]
-    top_indices = top_indices_unsorted[np.argsort(top_scores)[::-1]]
+    # Get the top k scores
+    top_indices = np.argsort(scores)[-k:][::-1]
 
     H = psd[:, top_indices]
     mu = psd.mean(axis=0)[top_indices]

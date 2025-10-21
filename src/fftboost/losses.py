@@ -16,8 +16,8 @@ class SquaredLoss:
     Mean squared loss with a 0.5 factor per-sample:
       L = 0.5 * mean((y_pred - y_true)**2)
 
-    Gradient is the mean gradient w.r.t. y_pred:
-      dL/dy_pred = (y_pred - y_true) / n
+    Gradient is the gradient of the sum of per-sample losses w.r.t. y_pred:
+      dL/dy_pred = y_pred - y_true
     """
 
     def __call__(
@@ -30,9 +30,7 @@ class SquaredLoss:
         self, y_true: np.ndarray[Any, Any], y_pred: np.ndarray[Any, Any]
     ) -> np.ndarray[Any, Any]:
         r = y_pred - y_true
-        return cast(np.ndarray[Any, Any], r.astype(np.float64, copy=False)) / len(
-            y_true
-        )
+        return cast(np.ndarray[Any, Any], r.astype(np.float64, copy=False))
 
 
 @final
@@ -45,10 +43,10 @@ class HuberLoss:
       if |r| <= delta: 0.5 * r^2
       else:            delta * (|r| - 0.5 * delta)
 
-    Gradient (mean) w.r.t. y_pred:
-      if |r| <  delta: r / n
-      if |r| >  delta: delta * sign(r) / n
-      if |r| == delta: uses the outer branch (delta * sign(r) / n)
+    Gradient of the sum of per-sample losses w.r.t. y_pred:
+      if |r| <  delta: r
+      if |r| >  delta: delta * sign(r)
+      if |r| == delta: uses the outer branch (delta * sign(r))
     """
 
     delta: float
@@ -73,9 +71,7 @@ class HuberLoss:
         r = y_pred - y_true
         abs_r = np.abs(r)
         grad = np.where(abs_r <= self.delta, r, self.delta * np.sign(r))
-        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False)) / len(
-            y_true
-        )
+        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False))
 
 
 @final
@@ -88,10 +84,10 @@ class QuantileLoss:
       if r >= 0: (1 - alpha) * r
       if r <  0: -alpha * r
 
-    Mean gradient w.r.t. y_pred:
-      if r > 0:  (1 - alpha) / n
-      if r < 0:  (-alpha)     / n
-      if r = 0:  uses r <= 0 branch (-alpha / n)
+    Gradient of the sum of per-sample losses w.r.t. y_pred:
+      if r > 0:  (1 - alpha)
+      if r < 0:  (-alpha)
+      if r = 0:  uses r <= 0 branch (-alpha)
     """
 
     alpha: float
@@ -113,9 +109,7 @@ class QuantileLoss:
     ) -> np.ndarray[Any, Any]:
         # Deterministic subgradient at r == 0 via y_true comparison
         grad = -np.where(y_true > y_pred, self.alpha, self.alpha - 1.0)
-        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False)) / len(
-            y_true
-        )
+        return cast(np.ndarray[Any, Any], grad.astype(np.float64, copy=False))
 
 
 @final
