@@ -18,6 +18,9 @@ class ExpertContext:
     y_labels: np.ndarray[Any, Any] | None = (
         None  # optional binary labels for classification
     )
+    # Sprint 0 additions for advanced experts
+    raw_windows: np.ndarray[Any, Any] | None = None  # shape: (n_windows, win_len)
+    complex_rfft: np.ndarray[Any, Any] | None = None  # shape: (n_windows, n_bins)
 
 
 @dataclass(frozen=True)

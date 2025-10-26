@@ -88,56 +88,68 @@ def fit_stage(
     proposals: list[Proposal],
     ridge_alpha: float,
     nu: float,
+    ensemble_k: int = 1,
 ) -> tuple[np.ndarray[Any, Any], StageRecord]:
     """
     Fit a single boosting stage against the residual using expert proposals.
 
     Steps:
-      1) Concatenate features; z-score per proposal-provided mu/sigma
-      2) Solve ridge for weights via Cholesky
-      3) raw_step = Z @ w
-      4) gamma from 1D least-squares line search
-      5) applied_step = nu * gamma * raw_step
+      1) Concatenate all proposed features from all experts.
+      2) Score each feature by its correlation with the residual.
+      3) Select the top `ensemble_k` features.
+      4) Solve a single multi-variate Ridge regression on this ensemble.
+      5) Perform a 1D line search (gamma) on the combined step.
+      6) The final step is nu * gamma * (Z_ensemble @ w).
     """
-    # Concatenate proposals
-    H, mu, sigma, descriptors = _concat_proposals(proposals)
+    # Concatenate all proposals into one large feature matrix
+    H_all, mu_all, sigma_all, descriptors_all = _concat_proposals(proposals)
 
     n_windows = residual.shape[0]
-    if H.size == 0:
-        # No features: zero step
-        applied = np.zeros(n_windows, dtype=np.float64)
-        rec = StageRecord(
-            weights=np.empty((0,), dtype=np.float64),
-            descriptors=descriptors,
-            mu=mu,
-            sigma=sigma,
+    if H_all.size == 0:
+        # No features proposed, return a zero step
+        return np.zeros(n_windows), StageRecord(
+            weights=np.empty(0),
+            descriptors=[],
+            mu=np.empty(0),
+            sigma=np.empty(0),
             gamma=0.0,
             ridge_alpha=ridge_alpha,
             nu=nu,
         )
-        return applied, rec
 
-    # Z-score with provided moments (protect against zero variance)
-    Z = (H - mu) / (sigma + 1e-12)
+    # Z-score all features for scoring
+    Z_all = (H_all - mu_all) / (sigma_all + 1e-12)
 
-    # Fit ridge weights
-    w = _ridge_fit_via_cholesky(Z, residual, ridge_alpha)
+    # Score every proposed feature by its correlation with the residual
+    res_z = (residual - residual.mean()) / (residual.std() + 1e-12)
+    scores = np.abs(res_z @ Z_all)
+
+    # Select the top `ensemble_k` features
+    k = min(ensemble_k, Z_all.shape[1])
+    top_indices = np.argsort(scores)[-k:][::-1]
+
+    # Create the final ensemble feature matrix for this stage
+    H_ensemble = H_all[:, top_indices]
+    mu_ensemble = mu_all[top_indices]
+    sigma_ensemble = sigma_all[top_indices]
+    descriptors_ensemble = [descriptors_all[i] for i in top_indices]
+    Z_ensemble = (H_ensemble - mu_ensemble) / (sigma_ensemble + 1e-12)
+
+    # Fit ridge weights on the selected ensemble
+    w = _ridge_fit_via_cholesky(Z_ensemble, residual, ridge_alpha)
 
     # Compute raw step and line-search gamma
-    raw_step = Z @ w
+    raw_step = Z_ensemble @ w
     denom = float(raw_step @ raw_step)
-    if denom == 0.0:
-        gamma = 0.0
-    else:
-        gamma = float((residual @ raw_step) / denom)
+    gamma = 0.0 if denom == 0.0 else float((residual @ raw_step) / denom)
 
     applied_step = (nu * gamma) * raw_step
 
     record = StageRecord(
         weights=w,
-        descriptors=descriptors,
-        mu=mu,
-        sigma=sigma,
+        descriptors=descriptors_ensemble,
+        mu=mu_ensemble,
+        sigma=sigma_ensemble,
         gamma=gamma,
         ridge_alpha=ridge_alpha,
         nu=nu,
