@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 
+from .. import temporal_operators as ops
 from .types import ExpertContext
 from .types import Proposal
 
@@ -36,8 +37,7 @@ def propose_flux(
         )
 
     # Temporal difference along windows (flux)
-    d = np.zeros_like(psd)
-    d[1:, :] = psd[1:, :] - psd[:-1, :]
+    d = ops.apply_diff(psd, order=1)
 
     # Score bins by correlation of original per-bin series with residual
     # (better at picking monotonic ramps than pure flux energy),
@@ -97,8 +97,7 @@ def propose_lagstack(
             continue
         x = psd[:, int(b)]
         for L in lags:
-            v = np.zeros_like(x)
-            v[L:] = x[:-L]
+            v = ops.apply_lag(x, lag=L)
             cols.append(v)
             desc.append(
                 {
@@ -157,8 +156,7 @@ def propose_burstpool(
     for b in range(n_bins):
         x = psd[:, b]
         for w in widths:
-            k = np.ones(w, dtype=np.float64) / float(w)
-            y = np.convolve(x, k, mode="same")
+            y = ops.apply_moving_average(x, width=w)
             cols.append(y)
             desc.append(
                 {

@@ -10,15 +10,17 @@ import numpy as np
 
 from .booster import Booster
 from .booster import BoosterConfig
+from .heads import ModelHead
 from .io import BoosterArtifact
 from .io import load_model
 from .io import save_model
 
 
 class FFTBoost:
-    def __init__(self, config: BoosterConfig):
+    def __init__(self, config: BoosterConfig, *, head: ModelHead | None = None):
         self.config = config
         self._booster: Booster | None = None
+        self.head = head  # Pluggable head, functionality to be wired in later sprints
         self.is_fitted: bool = False
         self._y_offset: float | None = None
         self.automl_info: dict[str, Any] | None = None
