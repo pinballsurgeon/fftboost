@@ -41,8 +41,8 @@ def test_fit_stage_converges_toward_residual() -> None:
 
     # Sanity on record content
     assert isinstance(rec, StageRecord)
-    assert rec.weights.shape[0] == sum(p.H.shape[1] for p in proposals)
-    assert len(rec.descriptors) == rec.weights.shape[0]
+    assert rec.weights.shape[0] == 1  # ensemble_k=1 by default
+    assert len(rec.descriptors) == 1
     assert rec.mu.shape == rec.sigma.shape == (rec.weights.shape[0],)
 
 
