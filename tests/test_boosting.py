@@ -41,9 +41,9 @@ def test_fit_stage_converges_toward_residual() -> None:
 
     # Sanity on record content
     assert isinstance(rec, StageRecord)
-    assert rec.weights.shape[0] == 1  # ensemble_k=1 by default
+    assert rec.weights.shape[0] == 1
     assert len(rec.descriptors) == 1
-    assert rec.mu.shape == rec.sigma.shape == (rec.weights.shape[0],)
+    assert rec.mu.shape == rec.sigma.shape == (1,)
 
 
 def test_fit_stage_is_deterministic() -> None:

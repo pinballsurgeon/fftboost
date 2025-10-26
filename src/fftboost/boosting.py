@@ -39,7 +39,7 @@ def _concat_proposals(
     Stack proposal matrices column-wise, and concatenate mu/sigma and descriptors.
     Returns (H, mu, sigma, descriptors).
     """
-    if len(proposals) == 0:
+    if not proposals:
         return (
             np.empty((0, 0), dtype=np.float64),
             np.empty((0,), dtype=np.float64),
@@ -47,16 +47,37 @@ def _concat_proposals(
             [],
         )
 
-    H_list = [p.H for p in proposals]
-    mu_list = [p.mu for p in proposals]
-    sigma_list = [p.sigma for p in proposals]
+    # Ensure all proposals have a consistent number of windows (first dimension)
+    n_windows = proposals[0].H.shape[0]
+    for p in proposals:
+        if p.H.shape[0] != n_windows:
+            # This case should ideally not happen if experts are implemented correctly
+            return (
+                np.empty((0, 0), dtype=np.float64),
+                np.empty((0,), dtype=np.float64),
+                np.empty((0,), dtype=np.float64),
+                [],
+            )
+
+    H_list = [p.H for p in proposals if p.H.size > 0]
+    mu_list = [p.mu for p in proposals if p.H.size > 0]
+    sigma_list = [p.sigma for p in proposals if p.H.size > 0]
     desc_list: list[dict[str, object]] = []
     for p in proposals:
-        desc_list.extend(p.descriptors)
+        if p.H.size > 0:
+            desc_list.extend(p.descriptors)
 
-    H = np.hstack(H_list) if len(H_list) > 1 else H_list[0]
-    mu = np.hstack(mu_list) if len(mu_list) > 1 else mu_list[0]
-    sigma = np.hstack(sigma_list) if len(sigma_list) > 1 else sigma_list[0]
+    if not H_list:
+        return (
+            np.empty((n_windows, 0), dtype=np.float64),
+            np.empty((0,), dtype=np.float64),
+            np.empty((0,), dtype=np.float64),
+            [],
+        )
+
+    H = np.hstack(H_list)
+    mu = np.concatenate(mu_list)
+    sigma = np.concatenate(sigma_list)
     return H, mu, sigma, desc_list
 
 
@@ -75,12 +96,16 @@ def _ridge_fit_via_cholesky(
     G.flat[:: n_features + 1] += alpha
     y = Z.T @ r
 
-    L = np.linalg.cholesky(G)
-    # Solve L z = y
-    z = np.linalg.solve(L, y)
-    # Solve L^T w = z
-    w = np.linalg.solve(L.T, z)
-    return cast(np.ndarray[Any, Any], w)
+    try:
+        L = np.linalg.cholesky(G)
+        # Solve L z = y
+        z = np.linalg.solve(L, y)
+        # Solve L^T w = z
+        w = np.linalg.solve(L.T, z)
+        return cast(np.ndarray[Any, Any], w)
+    except np.linalg.LinAlgError:
+        # Fallback for singular matrix
+        return np.linalg.pinv(G) @ y
 
 
 def fit_stage(
@@ -92,21 +117,13 @@ def fit_stage(
 ) -> tuple[np.ndarray[Any, Any], StageRecord]:
     """
     Fit a single boosting stage against the residual using expert proposals.
-
-    Steps:
-      1) Concatenate all proposed features from all experts.
-      2) Score each feature by its correlation with the residual.
-      3) Select the top `ensemble_k` features.
-      4) Solve a single multi-variate Ridge regression on this ensemble.
-      5) Perform a 1D line search (gamma) on the combined step.
-      6) The final step is nu * gamma * (Z_ensemble @ w).
+    This version implements a robust greedy selection of the single best feature.
     """
     # Concatenate all proposals into one large feature matrix
     H_all, mu_all, sigma_all, descriptors_all = _concat_proposals(proposals)
 
     n_windows = residual.shape[0]
     if H_all.size == 0:
-        # No features proposed, return a zero step
         return np.zeros(n_windows), StageRecord(
             weights=np.empty(0),
             descriptors=[],
@@ -124,22 +141,21 @@ def fit_stage(
     res_z = (residual - residual.mean()) / (residual.std() + 1e-12)
     scores = np.abs(res_z @ Z_all)
 
-    # Select the top `ensemble_k` features
-    k = min(ensemble_k, Z_all.shape[1])
-    top_indices = np.argsort(scores)[-k:][::-1]
+    # Select only the single best feature from all proposals
+    best_idx = np.argmax(scores)
 
-    # Create the final ensemble feature matrix for this stage
-    H_ensemble = H_all[:, top_indices]
-    mu_ensemble = mu_all[top_indices]
-    sigma_ensemble = sigma_all[top_indices]
-    descriptors_ensemble = [descriptors_all[i] for i in top_indices]
-    Z_ensemble = (H_ensemble - mu_ensemble) / (sigma_ensemble + 1e-12)
+    # Create the final feature matrix for this stage with only the best feature
+    H_best = H_all[:, [best_idx]]
+    mu_best = mu_all[[best_idx]]
+    sigma_best = sigma_all[[best_idx]]
+    descriptors_best = [descriptors_all[best_idx]]
+    Z_best = (H_best - mu_best) / (sigma_best + 1e-12)
 
-    # Fit ridge weights on the selected ensemble
-    w = _ridge_fit_via_cholesky(Z_ensemble, residual, ridge_alpha)
+    # Fit ridge weights (will be a 1D regression)
+    w = _ridge_fit_via_cholesky(Z_best, residual, ridge_alpha)
 
     # Compute raw step and line-search gamma
-    raw_step = Z_ensemble @ w
+    raw_step = Z_best @ w
     denom = float(raw_step @ raw_step)
     gamma = 0.0 if denom == 0.0 else float((residual @ raw_step) / denom)
 
@@ -147,9 +163,9 @@ def fit_stage(
 
     record = StageRecord(
         weights=w,
-        descriptors=descriptors_ensemble,
-        mu=mu_ensemble,
-        sigma=sigma_ensemble,
+        descriptors=descriptors_best,
+        mu=mu_best,
+        sigma=sigma_best,
         gamma=gamma,
         ridge_alpha=ridge_alpha,
         nu=nu,
